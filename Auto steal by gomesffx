@@ -1,36 +1,31 @@
 --==================================================
--- TIRAR DELAY + ULTRA OTIMIZAÇÃO
--- CLIENT-SIDE / MOBILE
+-- TIRAR DELAY - MOBILE EXTREME LIGHT
 --==================================================
 
 local Players = game:GetService("Players")
-local Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
+local Lighting = game:GetService("Lighting")
 
 local Player = Players.LocalPlayer
 
---==================================================
--- CONFIG
---==================================================
-
 local Enabled = false
+local Processing = false
 
 --==================================================
 -- GUI
 --==================================================
 
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "UltraOptimizer"
+Gui.Name = "TirarDelayMobile"
 Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
 Gui.Parent = Player:WaitForChild("PlayerGui")
 
 local Button = Instance.new("TextButton")
-Button.Name = "TirarDelay"
 Button.Size = UDim2.fromOffset(165, 48)
 Button.Position = UDim2.new(0.5, -82, 0.5, -24)
 
-Button.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+Button.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 Button.BorderSizePixel = 0
 
 Button.Text = "TIRAR DELAY: OFF"
@@ -45,7 +40,7 @@ Corner.CornerRadius = UDim.new(0, 12)
 Corner.Parent = Button
 
 local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(55, 55, 55)
+Stroke.Color = Color3.fromRGB(60, 60, 60)
 Stroke.Thickness = 1
 Stroke.Parent = Button
 
@@ -105,77 +100,49 @@ end)
 
 local Prompts = {}
 
-local function SetPrompt(Prompt)
+local function SetupPrompt(Object)
 
-    if not Prompt:IsA("ProximityPrompt") then
+    if not Object:IsA("ProximityPrompt") then
         return
     end
 
-    Prompts[Prompt] = true
+    Prompts[Object] = true
 
     if Enabled then
 
         pcall(function()
-            Prompt.HoldDuration = 0
+            Object.HoldDuration = 0
         end)
     end
 end
 
-local function RemovePrompt(Object)
-
-    Prompts[Object] = nil
-end
-
---==================================================
--- REGISTRAR PROMPTS EXISTENTES
---==================================================
-
-for _, Object in ipairs(workspace:GetDescendants()) do
-
-    if Object:IsA("ProximityPrompt") then
-        SetPrompt(Object)
-    end
-end
-
---==================================================
--- NOVOS PROMPTS / OBJETOS
---==================================================
-
 workspace.DescendantAdded:Connect(function(Object)
 
     if Object:IsA("ProximityPrompt") then
-        SetPrompt(Object)
+        SetupPrompt(Object)
     end
 end)
 
 workspace.DescendantRemoving:Connect(function(Object)
 
     if Object:IsA("ProximityPrompt") then
-        RemovePrompt(Object)
+        Prompts[Object] = nil
     end
 end)
 
 --==================================================
--- ESTADOS PARA RESTAURAR
+-- EFEITOS
 --==================================================
 
-local DisabledObjects = {}
+local Disabled = {}
 
-local OldGlobalShadows = Lighting.GlobalShadows
-local OldDiffuse = Lighting.EnvironmentDiffuseScale
-local OldSpecular = Lighting.EnvironmentSpecularScale
-
---==================================================
--- OTIMIZAÇÃO INDIVIDUAL
---==================================================
-
-local function Disable(Object)
+local function DisableEffect(Object)
 
     if not Object.Enabled then
         return
     end
 
-    DisabledObjects[Object] = true
+    Disabled[Object] = true
 
     pcall(function()
         Object.Enabled = false
@@ -184,147 +151,101 @@ end
 
 local function Optimize(Object)
 
-    if Object:IsA("ParticleEmitter") then
-
-        Disable(Object)
+    if not Enabled then
         return
     end
 
-    if Object:IsA("Trail") then
-
-        Disable(Object)
-        return
-    end
-
-    if Object:IsA("Beam") then
-
-        Disable(Object)
-        return
-    end
-
-    if Object:IsA("Smoke") then
-
-        Disable(Object)
-        return
-    end
-
-    if Object:IsA("Fire") then
-
-        Disable(Object)
-        return
-    end
-
-    if Object:IsA("Sparkles") then
-
-        Disable(Object)
-        return
-    end
-
-    if Object:IsA("PointLight")
+    if Object:IsA("ParticleEmitter")
+        or Object:IsA("Trail")
+        or Object:IsA("Beam")
+        or Object:IsA("Smoke")
+        or Object:IsA("Fire")
+        or Object:IsA("Sparkles")
+        or Object:IsA("PointLight")
         or Object:IsA("SpotLight")
-        or Object:IsA("SurfaceLight") then
-
-        Disable(Object)
-        return
-    end
-
-    if Object:IsA("BloomEffect")
+        or Object:IsA("SurfaceLight")
+        or Object:IsA("BloomEffect")
         or Object:IsA("BlurEffect")
         or Object:IsA("ColorCorrectionEffect")
         or Object:IsA("DepthOfFieldEffect")
         or Object:IsA("SunRaysEffect") then
 
-        Disable(Object)
-        return
+        DisableEffect(Object)
     end
 end
 
 --==================================================
--- ULTRA OTIMIZAÇÃO
+-- OTIMIZAÇÃO SEM TRAVAMENTO
 --==================================================
 
-local function OptimizeGame()
+local function OptimizeCharacter()
 
-    if not Enabled then
+    local Character = Player.Character
+
+    if not Character then
         return
     end
 
-    -- Uma única varredura.
-    local Objects =
-        game:GetDescendants()
-
-    for i = 1, #Objects do
+    for _, Object in ipairs(Character:GetDescendants()) do
 
         if not Enabled then
             return
         end
 
-        Optimize(Objects[i])
-
-        -- Divide a tarefa em pequenos lotes.
-        -- Isso evita congelar o celular.
-        if i % 150 == 0 then
-            task.wait()
-        end
+        Optimize(Object)
     end
-
-    if not Enabled then
-        return
-    end
-
-    --==================================================
-    -- LIGHTING
-    --==================================================
-
-    pcall(function()
-        Lighting.GlobalShadows = false
-    end)
-
-    pcall(function()
-        Lighting.EnvironmentDiffuseScale = 0
-    end)
-
-    pcall(function()
-        Lighting.EnvironmentSpecularScale = 0
-    end)
 end
 
---==================================================
--- OTIMIZAR SOMENTE OBJETOS NOVOS
---==================================================
-
+-- Novos efeitos são tratados individualmente.
 game.DescendantAdded:Connect(function(Object)
 
     if not Enabled then
         return
     end
 
-    -- Não faz nova varredura.
-    -- Só verifica o objeto que acabou de aparecer.
-    task.defer(function()
+    if Object:IsA("ParticleEmitter")
+        or Object:IsA("Trail")
+        or Object:IsA("Beam")
+        or Object:IsA("Smoke")
+        or Object:IsA("Fire")
+        or Object:IsA("Sparkles")
+        or Object:IsA("PointLight")
+        or Object:IsA("SpotLight")
+        or Object:IsA("SurfaceLight") then
 
-        if Enabled and Object.Parent then
-            Optimize(Object)
-        end
-    end)
+        task.defer(function()
+
+            if Enabled and Object.Parent then
+                Optimize(Object)
+            end
+        end)
+    end
 end)
 
 --==================================================
--- ATIVAR DELAY ZERO
+-- LIGHTING
+--==================================================
+
+local OldShadows = Lighting.GlobalShadows
+local OldDiffuse = Lighting.EnvironmentDiffuseScale
+local OldSpecular = Lighting.EnvironmentSpecularScale
+
+--==================================================
+-- ATIVAR
 --==================================================
 
 local function Enable()
 
-    if Enabled then
+    if Enabled or Processing then
         return
     end
 
     Enabled = true
+    Processing = true
 
-    Button.Text =
-        "TIRAR DELAY: ON"
+    Button.Text = "TIRAR DELAY: ON"
 
-    -- Prompts atuais
+    -- Prompts conhecidos.
     for Prompt in pairs(Prompts) do
 
         if Prompt and Prompt.Parent then
@@ -335,23 +256,38 @@ local function Enable()
         end
     end
 
-    -- Otimização pesada apenas uma vez.
-    task.spawn(OptimizeGame)
+    -- Lighting é instantâneo e leve.
+    pcall(function()
+        Lighting.GlobalShadows = false
+        Lighting.EnvironmentDiffuseScale = 0
+        Lighting.EnvironmentSpecularScale = 0
+    end)
+
+    -- Só personagem local, evitando varrer o jogo inteiro.
+    task.spawn(function()
+
+        OptimizeCharacter()
+
+        Processing = false
+    end)
 end
 
 --==================================================
 -- DESATIVAR
 --==================================================
 
-local function DisableOptimization()
+local function Disable()
+
+    if Processing then
+        return
+    end
 
     Enabled = false
 
-    Button.Text =
-        "TIRAR DELAY: OFF"
+    Button.Text = "TIRAR DELAY: OFF"
 
-    -- Restaurar efeitos
-    for Object in pairs(DisabledObjects) do
+    -- Restaura efeitos.
+    for Object in pairs(Disabled) do
 
         if Object and Object.Parent then
 
@@ -361,21 +297,13 @@ local function DisableOptimization()
         end
     end
 
-    table.clear(DisabledObjects)
+    table.clear(Disabled)
 
+    -- Restaura iluminação.
     pcall(function()
-        Lighting.GlobalShadows =
-            OldGlobalShadows
-    end)
-
-    pcall(function()
-        Lighting.EnvironmentDiffuseScale =
-            OldDiffuse
-    end)
-
-    pcall(function()
-        Lighting.EnvironmentSpecularScale =
-            OldSpecular
+        Lighting.GlobalShadows = OldShadows
+        Lighting.EnvironmentDiffuseScale = OldDiffuse
+        Lighting.EnvironmentSpecularScale = OldSpecular
     end)
 end
 
@@ -386,7 +314,7 @@ end
 Button.Activated:Connect(function()
 
     if Enabled then
-        DisableOptimization()
+        Disable()
     else
         Enable()
     end
@@ -402,16 +330,9 @@ Player.CharacterAdded:Connect(function(Character)
         return
     end
 
-    -- Só otimiza o personagem novo.
-    task.defer(function()
+    task.wait(0.5)
 
-        for _, Object in ipairs(Character:GetDescendants()) do
-
-            if not Enabled then
-                return
-            end
-
-            Optimize(Object)
-        end
-    end)
+    if Enabled then
+        OptimizeCharacter()
+    end
 end)
