@@ -1,52 +1,56 @@
---==================================================
--- TIRAR DELAY - MOBILE EXTREME LIGHT
---==================================================
+--// TIRAR DELAY - LOCAL SCRIPT
+--// Coloque em StarterPlayer > StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
 
 local Player = Players.LocalPlayer
 
+--// CONFIGURAÇÕES
+local RADIUS = 200
+local CHECK_INTERVAL = 0.15
+
 local Enabled = false
-local Processing = false
+local OriginalHoldDuration = {}
 
---==================================================
--- GUI
---==================================================
+--// =========================================================
+--// GUI
+--// =========================================================
 
-local Gui = Instance.new("ScreenGui")
-Gui.Name = "TirarDelayMobile"
-Gui.ResetOnSpawn = false
-Gui.IgnoreGuiInset = true
-Gui.Parent = Player:WaitForChild("PlayerGui")
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "TirarDelayUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
 local Button = Instance.new("TextButton")
-Button.Size = UDim2.fromOffset(165, 48)
-Button.Position = UDim2.new(0.5, -82, 0.5, -24)
+Button.Name = "TirarDelay"
+Button.Size = UDim2.new(0, 125, 0, 38)
+Button.Position = UDim2.new(0, 20, 0.5, -19)
 
-Button.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 Button.BorderSizePixel = 0
 
-Button.Text = "TIRAR DELAY: OFF"
-Button.TextColor3 = Color3.new(1, 1, 1)
-Button.TextSize = 14
+Button.Text = "TIRAR DELAY"
+Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+Button.TextSize = 13
 Button.Font = Enum.Font.GothamBold
 
-Button.Parent = Gui
+Button.AutoButtonColor = false
+Button.Parent = ScreenGui
 
 local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 12)
+Corner.CornerRadius = UDim.new(0, 10)
 Corner.Parent = Button
 
 local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(60, 60, 60)
+Stroke.Color = Color3.fromRGB(45, 45, 45)
 Stroke.Thickness = 1
 Stroke.Parent = Button
 
---==================================================
--- DRAG
---==================================================
+--// =========================================================
+--// ARRASTAR BOTÃO
+--// =========================================================
 
 local Dragging = false
 local DragStart
@@ -54,285 +58,248 @@ local StartPosition
 
 Button.InputBegan:Connect(function(Input)
 
-    if Input.UserInputType == Enum.UserInputType.Touch
-        or Input.UserInputType == Enum.UserInputType.MouseButton1 then
+	if Input.UserInputType == Enum.UserInputType.MouseButton1
+	or Input.UserInputType == Enum.UserInputType.Touch then
 
-        Dragging = true
-        DragStart = Input.Position
-        StartPosition = Button.Position
-    end
-end)
+		Dragging = true
+		DragStart = Input.Position
+		StartPosition = Button.Position
+	end
 
-Button.InputEnded:Connect(function(Input)
-
-    if Input.UserInputType == Enum.UserInputType.Touch
-        or Input.UserInputType == Enum.UserInputType.MouseButton1 then
-
-        Dragging = false
-    end
 end)
 
 UserInputService.InputChanged:Connect(function(Input)
 
-    if not Dragging then
-        return
-    end
+	if not Dragging then
+		return
+	end
 
-    if Input.UserInputType == Enum.UserInputType.Touch
-        or Input.UserInputType == Enum.UserInputType.MouseMovement then
+	if Input.UserInputType == Enum.UserInputType.MouseMovement
+	or Input.UserInputType == Enum.UserInputType.Touch then
 
-        local Delta =
-            Input.Position - DragStart
+		local Delta = Input.Position - DragStart
 
-        Button.Position = UDim2.new(
-            StartPosition.X.Scale,
-            StartPosition.X.Offset + Delta.X,
+		Button.Position = UDim2.new(
+			StartPosition.X.Scale,
+			StartPosition.X.Offset + Delta.X,
+			StartPosition.Y.Scale,
+			StartPosition.Y.Offset + Delta.Y
+		)
 
-            StartPosition.Y.Scale,
-            StartPosition.Y.Offset + Delta.Y
-        )
-    end
+	end
+
 end)
 
---==================================================
--- PROMPTS
---==================================================
+UserInputService.InputEnded:Connect(function(Input)
 
-local Prompts = {}
+	if Input.UserInputType == Enum.UserInputType.MouseButton1
+	or Input.UserInputType == Enum.UserInputType.Touch then
 
-local function SetupPrompt(Object)
+		Dragging = false
 
-    if not Object:IsA("ProximityPrompt") then
-        return
-    end
+	end
 
-    Prompts[Object] = true
-
-    if Enabled then
-
-        pcall(function()
-            Object.HoldDuration = 0
-        end)
-    end
-end
-
-workspace.DescendantAdded:Connect(function(Object)
-
-    if Object:IsA("ProximityPrompt") then
-        SetupPrompt(Object)
-    end
 end)
 
-workspace.DescendantRemoving:Connect(function(Object)
+--// =========================================================
+--// PERSONAGEM
+--// =========================================================
 
-    if Object:IsA("ProximityPrompt") then
-        Prompts[Object] = nil
-    end
-end)
+local function GetRoot()
 
---==================================================
--- EFEITOS
---==================================================
+	local Character = Player.Character
 
-local Disabled = {}
+	if not Character then
+		return nil
+	end
 
-local function DisableEffect(Object)
-
-    if not Object.Enabled then
-        return
-    end
-
-    Disabled[Object] = true
-
-    pcall(function()
-        Object.Enabled = false
-    end)
+	return Character:FindFirstChild("HumanoidRootPart")
 end
 
-local function Optimize(Object)
+--// =========================================================
+--// RESTAURAR PROMPT
+--// =========================================================
 
-    if not Enabled then
-        return
-    end
+local function RestorePrompt(Prompt)
 
-    if Object:IsA("ParticleEmitter")
-        or Object:IsA("Trail")
-        or Object:IsA("Beam")
-        or Object:IsA("Smoke")
-        or Object:IsA("Fire")
-        or Object:IsA("Sparkles")
-        or Object:IsA("PointLight")
-        or Object:IsA("SpotLight")
-        or Object:IsA("SurfaceLight")
-        or Object:IsA("BloomEffect")
-        or Object:IsA("BlurEffect")
-        or Object:IsA("ColorCorrectionEffect")
-        or Object:IsA("DepthOfFieldEffect")
-        or Object:IsA("SunRaysEffect") then
+	local Original = OriginalHoldDuration[Prompt]
 
-        DisableEffect(Object)
-    end
+	if Original ~= nil and Prompt.Parent then
+		Prompt.HoldDuration = Original
+	end
+
+	OriginalHoldDuration[Prompt] = nil
+
 end
 
---==================================================
--- OTIMIZAÇÃO SEM TRAVAMENTO
---==================================================
+--// =========================================================
+--// APLICAR DELAY ZERO
+--// =========================================================
 
-local function OptimizeCharacter()
+local function RemoveDelay(Prompt)
 
-    local Character = Player.Character
+	if not Prompt:IsA("ProximityPrompt") then
+		return
+	end
 
-    if not Character then
-        return
-    end
+	if not Prompt.Enabled then
+		return
+	end
 
-    for _, Object in ipairs(Character:GetDescendants()) do
+	-- Guarda o valor original apenas uma vez
+	if OriginalHoldDuration[Prompt] == nil then
+		OriginalHoldDuration[Prompt] = Prompt.HoldDuration
+	end
 
-        if not Enabled then
-            return
-        end
+	-- Só altera se realmente precisar
+	if Prompt.HoldDuration ~= 0 then
+		Prompt.HoldDuration = 0
+	end
 
-        Optimize(Object)
-    end
 end
 
--- Novos efeitos são tratados individualmente.
-game.DescendantAdded:Connect(function(Object)
+--// =========================================================
+--// VERIFICAÇÃO OTIMIZADA
+--// =========================================================
 
-    if not Enabled then
-        return
-    end
+local function UpdatePrompts()
 
-    if Object:IsA("ParticleEmitter")
-        or Object:IsA("Trail")
-        or Object:IsA("Beam")
-        or Object:IsA("Smoke")
-        or Object:IsA("Fire")
-        or Object:IsA("Sparkles")
-        or Object:IsA("PointLight")
-        or Object:IsA("SpotLight")
-        or Object:IsA("SurfaceLight") then
+	if not Enabled then
+		return
+	end
 
-        task.defer(function()
+	local Root = GetRoot()
 
-            if Enabled and Object.Parent then
-                Optimize(Object)
-            end
-        end)
-    end
-end)
+	if not Root then
+		return
+	end
 
---==================================================
--- LIGHTING
---==================================================
+	local RootPosition = Root.Position
+	local RadiusSquared = RADIUS * RADIUS
 
-local OldShadows = Lighting.GlobalShadows
-local OldDiffuse = Lighting.EnvironmentDiffuseScale
-local OldSpecular = Lighting.EnvironmentSpecularScale
+	for Prompt, Original in pairs(OriginalHoldDuration) do
 
---==================================================
--- ATIVAR
---==================================================
+		if not Prompt.Parent then
 
-local function Enable()
+			OriginalHoldDuration[Prompt] = nil
 
-    if Enabled or Processing then
-        return
-    end
+		else
 
-    Enabled = true
-    Processing = true
+			local Part = Prompt.Parent
 
-    Button.Text = "TIRAR DELAY: ON"
+			if Part:IsA("BasePart") then
 
-    -- Prompts conhecidos.
-    for Prompt in pairs(Prompts) do
+				local Distance = Part.Position - RootPosition
 
-        if Prompt and Prompt.Parent then
+				if Distance:Dot(Distance) > RadiusSquared then
+					RestorePrompt(Prompt)
+				end
 
-            pcall(function()
-                Prompt.HoldDuration = 0
-            end)
-        end
-    end
+			end
 
-    -- Lighting é instantâneo e leve.
-    pcall(function()
-        Lighting.GlobalShadows = false
-        Lighting.EnvironmentDiffuseScale = 0
-        Lighting.EnvironmentSpecularScale = 0
-    end)
+		end
 
-    -- Só personagem local, evitando varrer o jogo inteiro.
-    task.spawn(function()
+	end
 
-        OptimizeCharacter()
+	-- Procura somente partes próximas.
+	-- Não percorre o Workspace inteiro.
+	local Parts = workspace:GetPartBoundsInRadius(
+		RootPosition,
+		RADIUS
+	)
 
-        Processing = false
-    end)
+	for _, Part in ipairs(Parts) do
+
+		for _, Object in ipairs(Part:GetDescendants()) do
+
+			if Object:IsA("ProximityPrompt") then
+				RemoveDelay(Object)
+			end
+
+		end
+
+	end
+
 end
 
---==================================================
--- DESATIVAR
---==================================================
+--// =========================================================
+--// DESATIVAR
+--// =========================================================
 
 local function Disable()
 
-    if Processing then
-        return
-    end
+	Enabled = false
 
-    Enabled = false
+	for Prompt, Original in pairs(OriginalHoldDuration) do
 
-    Button.Text = "TIRAR DELAY: OFF"
+		if Prompt.Parent then
+			Prompt.HoldDuration = Original
+		end
 
-    -- Restaura efeitos.
-    for Object in pairs(Disabled) do
+	end
 
-        if Object and Object.Parent then
+	table.clear(OriginalHoldDuration)
 
-            pcall(function()
-                Object.Enabled = true
-            end)
-        end
-    end
+	Button.Text = "TIRAR DELAY"
+	Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	Stroke.Color = Color3.fromRGB(45, 45, 45)
 
-    table.clear(Disabled)
-
-    -- Restaura iluminação.
-    pcall(function()
-        Lighting.GlobalShadows = OldShadows
-        Lighting.EnvironmentDiffuseScale = OldDiffuse
-        Lighting.EnvironmentSpecularScale = OldSpecular
-    end)
 end
 
---==================================================
--- BOTÃO
---==================================================
+--// =========================================================
+--// ATIVAR
+--// =========================================================
+
+local function Enable()
+
+	Enabled = true
+
+	Button.Text = "DELAY: ON"
+	Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	Stroke.Color = Color3.fromRGB(80, 80, 80)
+
+end
+
+--// =========================================================
+--// BOTÃO
+--// =========================================================
 
 Button.Activated:Connect(function()
 
-    if Enabled then
-        Disable()
-    else
-        Enable()
-    end
+	if Enabled then
+		Disable()
+	else
+		Enable()
+	end
+
 end)
 
---==================================================
--- RESPAWN
---==================================================
+--// =========================================================
+--// LOOP LEVE
+--// =========================================================
 
-Player.CharacterAdded:Connect(function(Character)
+task.spawn(function()
 
-    if not Enabled then
-        return
-    end
+	while ScreenGui.Parent do
 
-    task.wait(0.5)
+		if Enabled then
+			UpdatePrompts()
+		end
 
-    if Enabled then
-        OptimizeCharacter()
-    end
+		task.wait(CHECK_INTERVAL)
+
+	end
+
+end)
+
+--// =========================================================
+--// LIMPEZA AO MORRER
+--// =========================================================
+
+Player.CharacterAdded:Connect(function()
+
+	-- Não precisa desligar a função.
+	-- Apenas limpa referências antigas.
+	table.clear(OriginalHoldDuration)
+
 end)
