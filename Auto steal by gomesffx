@@ -1,21 +1,31 @@
---// TIRAR DELAY - LOCAL SCRIPT
---// Coloque em StarterPlayer > StarterPlayerScripts
+--// TIRAR DELAY
+--// LocalScript
+--// StarterPlayer > StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local Player = Players.LocalPlayer
 
---// CONFIGURAÇÕES
+--==================================================
+-- CONFIG
+--==================================================
+
 local RADIUS = 200
+local RADIUS_SQUARED = RADIUS * RADIUS
+
+-- Intervalo da verificação.
+-- Não usa Heartbeat para evitar peso desnecessário.
 local CHECK_INTERVAL = 0.15
 
 local Enabled = false
-local OriginalHoldDuration = {}
 
---// =========================================================
---// GUI
---// =========================================================
+-- Guarda o HoldDuration original de cada prompt
+local OriginalDuration = {}
+
+--==================================================
+-- GUI
+--==================================================
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TirarDelayUI"
@@ -25,10 +35,10 @@ ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
 local Button = Instance.new("TextButton")
 Button.Name = "TirarDelay"
-Button.Size = UDim2.new(0, 125, 0, 38)
+Button.Size = UDim2.fromOffset(125, 38)
 Button.Position = UDim2.new(0, 20, 0.5, -19)
 
-Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+Button.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 Button.BorderSizePixel = 0
 
 Button.Text = "TIRAR DELAY"
@@ -48,9 +58,9 @@ Stroke.Color = Color3.fromRGB(45, 45, 45)
 Stroke.Thickness = 1
 Stroke.Parent = Button
 
---// =========================================================
---// ARRASTAR BOTÃO
---// =========================================================
+--==================================================
+-- ARRASTAR
+--==================================================
 
 local Dragging = false
 local DragStart
@@ -59,11 +69,12 @@ local StartPosition
 Button.InputBegan:Connect(function(Input)
 
 	if Input.UserInputType == Enum.UserInputType.MouseButton1
-	or Input.UserInputType == Enum.UserInputType.Touch then
+		or Input.UserInputType == Enum.UserInputType.Touch then
 
 		Dragging = true
 		DragStart = Input.Position
 		StartPosition = Button.Position
+
 	end
 
 end)
@@ -75,13 +86,14 @@ UserInputService.InputChanged:Connect(function(Input)
 	end
 
 	if Input.UserInputType == Enum.UserInputType.MouseMovement
-	or Input.UserInputType == Enum.UserInputType.Touch then
+		or Input.UserInputType == Enum.UserInputType.Touch then
 
 		local Delta = Input.Position - DragStart
 
 		Button.Position = UDim2.new(
 			StartPosition.X.Scale,
 			StartPosition.X.Offset + Delta.X,
+
 			StartPosition.Y.Scale,
 			StartPosition.Y.Offset + Delta.Y
 		)
@@ -93,7 +105,7 @@ end)
 UserInputService.InputEnded:Connect(function(Input)
 
 	if Input.UserInputType == Enum.UserInputType.MouseButton1
-	or Input.UserInputType == Enum.UserInputType.Touch then
+		or Input.UserInputType == Enum.UserInputType.Touch then
 
 		Dragging = false
 
@@ -101,9 +113,9 @@ UserInputService.InputEnded:Connect(function(Input)
 
 end)
 
---// =========================================================
---// PERSONAGEM
---// =========================================================
+--==================================================
+-- ROOT DO JOGADOR
+--==================================================
 
 local function GetRoot()
 
@@ -116,25 +128,61 @@ local function GetRoot()
 	return Character:FindFirstChild("HumanoidRootPart")
 end
 
---// =========================================================
---// RESTAURAR PROMPT
---// =========================================================
+--==================================================
+-- POSIÇÃO REAL DO PROMPT
+--==================================================
+
+local function GetPromptPosition(Prompt)
+
+	local Parent = Prompt.Parent
+
+	if not Parent then
+		return nil
+	end
+
+	-- Prompt diretamente dentro de uma Part
+	if Parent:IsA("BasePart") then
+		return Parent.Position
+	end
+
+	-- Prompt dentro de Attachment
+	if Parent:IsA("Attachment") then
+		return Parent.WorldPosition
+	end
+
+	-- Procura uma BasePart ancestral
+	local Part = Prompt:FindFirstAncestorWhichIsA("BasePart")
+
+	if Part then
+		return Part.Position
+	end
+
+	return nil
+end
+
+--==================================================
+-- RESTAURA PROMPT
+--==================================================
 
 local function RestorePrompt(Prompt)
 
-	local Original = OriginalHoldDuration[Prompt]
+	local Original = OriginalDuration[Prompt]
 
-	if Original ~= nil and Prompt.Parent then
+	if Original == nil then
+		return
+	end
+
+	if Prompt.Parent then
 		Prompt.HoldDuration = Original
 	end
 
-	OriginalHoldDuration[Prompt] = nil
+	OriginalDuration[Prompt] = nil
 
 end
 
---// =========================================================
---// APLICAR DELAY ZERO
---// =========================================================
+--==================================================
+-- REMOVE DELAY
+--==================================================
 
 local function RemoveDelay(Prompt)
 
@@ -142,25 +190,26 @@ local function RemoveDelay(Prompt)
 		return
 	end
 
-	if not Prompt.Enabled then
+	if not Prompt.Parent then
+		OriginalDuration[Prompt] = nil
 		return
 	end
 
-	-- Guarda o valor original apenas uma vez
-	if OriginalHoldDuration[Prompt] == nil then
-		OriginalHoldDuration[Prompt] = Prompt.HoldDuration
+	-- Guarda o valor original somente na primeira vez
+	if OriginalDuration[Prompt] == nil then
+		OriginalDuration[Prompt] = Prompt.HoldDuration
 	end
 
-	-- Só altera se realmente precisar
+	-- Só escreve quando necessário
 	if Prompt.HoldDuration ~= 0 then
 		Prompt.HoldDuration = 0
 	end
 
 end
 
---// =========================================================
---// VERIFICAÇÃO OTIMIZADA
---// =========================================================
+--==================================================
+-- ATUALIZAR PROMPTS
+--==================================================
 
 local function UpdatePrompts()
 
@@ -174,25 +223,91 @@ local function UpdatePrompts()
 		return
 	end
 
-	local RootPosition = Root.Position
-	local RadiusSquared = RADIUS * RADIUS
+	local PlayerPosition = Root.Position
 
-	for Prompt, Original in pairs(OriginalHoldDuration) do
+	--================================================
+	-- 1. VERIFICA OS QUE JÁ ESTÃO SENDO CONTROLADOS
+	--================================================
+
+	for Prompt in pairs(OriginalDuration) do
 
 		if not Prompt.Parent then
 
-			OriginalHoldDuration[Prompt] = nil
+			OriginalDuration[Prompt] = nil
 
 		else
 
-			local Part = Prompt.Parent
+			local PromptPosition = GetPromptPosition(Prompt)
 
-			if Part:IsA("BasePart") then
+			if PromptPosition then
 
-				local Distance = Part.Position - RootPosition
+				local Offset = PromptPosition - PlayerPosition
+				local DistanceSquared = Offset:Dot(Offset)
 
-				if Distance:Dot(Distance) > RadiusSquared then
+				-- Saiu dos 200 studs
+				if DistanceSquared > RADIUS_SQUARED then
 					RestorePrompt(Prompt)
+				end
+
+			else
+
+				RestorePrompt(Prompt)
+
+			end
+
+		end
+
+	end
+
+	--================================================
+	-- 2. PROCURA SOMENTE PARTES PRÓXIMAS
+	--================================================
+
+	local NearbyParts = workspace:GetPartBoundsInRadius(
+		PlayerPosition,
+		RADIUS
+	)
+
+	for _, Part in ipairs(NearbyParts) do
+
+		-- Verifica a própria Part
+		if Part:IsA("BasePart") then
+
+			local DirectPrompt = Part:FindFirstChildOfClass("ProximityPrompt")
+
+			if DirectPrompt then
+
+				local PromptPosition = GetPromptPosition(DirectPrompt)
+
+				if PromptPosition then
+
+					local Offset = PromptPosition - PlayerPosition
+
+					if Offset:Dot(Offset) <= RADIUS_SQUARED then
+						RemoveDelay(DirectPrompt)
+					end
+
+				end
+
+			end
+
+		end
+
+		-- Verifica prompts dentro de Attachments/objetos
+		for _, Object in ipairs(Part:GetDescendants()) do
+
+			if Object:IsA("ProximityPrompt") then
+
+				local PromptPosition = GetPromptPosition(Object)
+
+				if PromptPosition then
+
+					local Offset = PromptPosition - PlayerPosition
+
+					if Offset:Dot(Offset) <= RADIUS_SQUARED then
+						RemoveDelay(Object)
+					end
+
 				end
 
 			end
@@ -201,36 +316,17 @@ local function UpdatePrompts()
 
 	end
 
-	-- Procura somente partes próximas.
-	-- Não percorre o Workspace inteiro.
-	local Parts = workspace:GetPartBoundsInRadius(
-		RootPosition,
-		RADIUS
-	)
-
-	for _, Part in ipairs(Parts) do
-
-		for _, Object in ipairs(Part:GetDescendants()) do
-
-			if Object:IsA("ProximityPrompt") then
-				RemoveDelay(Object)
-			end
-
-		end
-
-	end
-
 end
 
---// =========================================================
---// DESATIVAR
---// =========================================================
+--==================================================
+-- DESATIVAR
+--==================================================
 
 local function Disable()
 
 	Enabled = false
 
-	for Prompt, Original in pairs(OriginalHoldDuration) do
+	for Prompt, Original in pairs(OriginalDuration) do
 
 		if Prompt.Parent then
 			Prompt.HoldDuration = Original
@@ -238,31 +334,34 @@ local function Disable()
 
 	end
 
-	table.clear(OriginalHoldDuration)
+	table.clear(OriginalDuration)
 
 	Button.Text = "TIRAR DELAY"
-	Button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+	Button.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 	Stroke.Color = Color3.fromRGB(45, 45, 45)
 
 end
 
---// =========================================================
---// ATIVAR
---// =========================================================
+--==================================================
+-- ATIVAR
+--==================================================
 
 local function Enable()
 
 	Enabled = true
 
 	Button.Text = "DELAY: ON"
-	Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+	Button.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
 	Stroke.Color = Color3.fromRGB(80, 80, 80)
+
+	-- Faz uma atualização imediatamente
+	UpdatePrompts()
 
 end
 
---// =========================================================
---// BOTÃO
---// =========================================================
+--==================================================
+-- BOTÃO
+--==================================================
 
 Button.Activated:Connect(function()
 
@@ -274,9 +373,9 @@ Button.Activated:Connect(function()
 
 end)
 
---// =========================================================
---// LOOP LEVE
---// =========================================================
+--==================================================
+-- LOOP OTIMIZADO
+--==================================================
 
 task.spawn(function()
 
@@ -292,14 +391,14 @@ task.spawn(function()
 
 end)
 
---// =========================================================
---// LIMPEZA AO MORRER
---// =========================================================
+--==================================================
+-- RESPAWN
+--==================================================
 
 Player.CharacterAdded:Connect(function()
 
-	-- Não precisa desligar a função.
-	-- Apenas limpa referências antigas.
-	table.clear(OriginalHoldDuration)
+	-- Os prompts continuam existindo no mapa,
+	-- mas limpamos as referências antigas.
+	table.clear(OriginalDuration)
 
 end)
