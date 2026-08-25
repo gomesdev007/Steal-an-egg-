@@ -1,851 +1,333 @@
 --==================================================
--- TESTE + IR ATÉ O MAIS PERTO
--- MOBILE OPTIMIZED / RESPAWN SAFE
+-- TIRAR DELAY + ULTRA OTIMIZAÇÃO
+-- CLIENT-SIDE / MOBILE
 --==================================================
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 
-local LocalPlayer = Players.LocalPlayer
+local Player = Players.LocalPlayer
 
 --==================================================
--- CONFIGURAÇÕES
+-- CONFIG
 --==================================================
 
-local TestEnabled = false
-
-local CIRCLE_SEGMENTS = 20
-local CIRCLE_HEIGHT = 0.06
-local CIRCLE_THICKNESS = 0.08
-
-local PROMPT_INTERVAL = 0.50
-local DEFAULT_RADIUS = 10
+local Enabled = false
 
 --==================================================
 -- GUI
 --==================================================
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TestePromptUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "UltraOptimizer"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.Parent = Player:WaitForChild("PlayerGui")
 
-local function CreateButton(Name, Text, Position)
+local Button = Instance.new("TextButton")
+Button.Name = "TirarDelay"
+Button.Size = UDim2.fromOffset(165, 48)
+Button.Position = UDim2.new(0.5, -82, 0.5, -24)
 
-    local Button = Instance.new("TextButton")
+Button.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+Button.BorderSizePixel = 0
 
-    Button.Name = Name
-    Button.Size = UDim2.fromOffset(145, 45)
-    Button.Position = Position
+Button.Text = "TIRAR DELAY: OFF"
+Button.TextColor3 = Color3.new(1, 1, 1)
+Button.TextSize = 14
+Button.Font = Enum.Font.GothamBold
 
-    Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    Button.BorderSizePixel = 0
+Button.Parent = Gui
 
-    Button.Text = Text
-    Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Button.TextSize = 14
-    Button.Font = Enum.Font.GothamBold
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 12)
+Corner.Parent = Button
 
-    Button.AutoButtonColor = false
-    Button.Parent = ScreenGui
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 12)
-    Corner.Parent = Button
-
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(65, 65, 65)
-    Stroke.Thickness = 1
-    Stroke.Parent = Button
-
-    return Button
-end
-
-local TestButton = CreateButton(
-    "Teste",
-    "TESTE: OFF",
-    UDim2.new(0.5, -72, 0.5, -50)
-)
-
-local NearButton = CreateButton(
-    "IrMaisPerto",
-    "IR ATÉ O MAIS PERTO",
-    UDim2.new(0.5, -72, 0.5, 5)
-)
+local Stroke = Instance.new("UIStroke")
+Stroke.Color = Color3.fromRGB(55, 55, 55)
+Stroke.Thickness = 1
+Stroke.Parent = Button
 
 --==================================================
 -- DRAG
 --==================================================
 
-local function MakeDraggable(Button)
+local Dragging = false
+local DragStart
+local StartPosition
 
-    local Dragging = false
-    local DragStart
-    local StartPosition
+Button.InputBegan:Connect(function(Input)
 
-    Button.InputBegan:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.Touch
+        or Input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-        if Input.UserInputType == Enum.UserInputType.MouseButton1
-            or Input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragStart = Input.Position
+        StartPosition = Button.Position
+    end
+end)
 
-            Dragging = true
-            DragStart = Input.Position
-            StartPosition = Button.Position
-        end
-    end)
+Button.InputEnded:Connect(function(Input)
 
-    Button.InputEnded:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.Touch
+        or Input.UserInputType == Enum.UserInputType.MouseButton1 then
 
-        if Input.UserInputType == Enum.UserInputType.MouseButton1
-            or Input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = false
+    end
+end)
 
-            Dragging = false
-        end
-    end)
+UserInputService.InputChanged:Connect(function(Input)
 
-    UserInputService.InputChanged:Connect(function(Input)
-
-        if not Dragging then
-            return
-        end
-
-        if Input.UserInputType == Enum.UserInputType.MouseMovement
-            or Input.UserInputType == Enum.UserInputType.Touch then
-
-            local Delta = Input.Position - DragStart
-
-            Button.Position = UDim2.new(
-                StartPosition.X.Scale,
-                StartPosition.X.Offset + Delta.X,
-
-                StartPosition.Y.Scale,
-                StartPosition.Y.Offset + Delta.Y
-            )
-        end
-    end)
-end
-
-MakeDraggable(TestButton)
-MakeDraggable(NearButton)
-
---==================================================
--- PERSONAGEM ATUAL
---==================================================
-
-local Character = nil
-local Humanoid = nil
-local Root = nil
-
-local function UpdateCharacter(NewCharacter)
-
-    Character = NewCharacter
-
-    if not Character then
-        Humanoid = nil
-        Root = nil
+    if not Dragging then
         return
     end
 
-    Humanoid = Character:WaitForChild(
-        "Humanoid",
-        10
-    )
+    if Input.UserInputType == Enum.UserInputType.Touch
+        or Input.UserInputType == Enum.UserInputType.MouseMovement then
 
-    Root = Character:WaitForChild(
-        "HumanoidRootPart",
-        10
-    )
-end
+        local Delta =
+            Input.Position - DragStart
 
-if LocalPlayer.Character then
-    UpdateCharacter(LocalPlayer.Character)
-end
+        Button.Position = UDim2.new(
+            StartPosition.X.Scale,
+            StartPosition.X.Offset + Delta.X,
+
+            StartPosition.Y.Scale,
+            StartPosition.Y.Offset + Delta.Y
+        )
+    end
+end)
 
 --==================================================
 -- PROMPTS
 --==================================================
 
 local Prompts = {}
-local OriginalHoldDuration = {}
 
-local function RegisterPrompt(Object)
+local function SetPrompt(Prompt)
 
-    if not Object:IsA("ProximityPrompt") then
+    if not Prompt:IsA("ProximityPrompt") then
         return
     end
 
-    Prompts[Object] = true
+    Prompts[Prompt] = true
 
-    if OriginalHoldDuration[Object] == nil then
-
-        OriginalHoldDuration[Object] =
-            Object.HoldDuration
-    end
-
-    if TestEnabled then
+    if Enabled then
 
         pcall(function()
-            Object.HoldDuration = 0
+            Prompt.HoldDuration = 0
         end)
     end
 end
 
-local function UnregisterPrompt(Object)
+local function RemovePrompt(Object)
 
     Prompts[Object] = nil
-    OriginalHoldDuration[Object] = nil
 end
 
--- Registro inicial
+--==================================================
+-- REGISTRAR PROMPTS EXISTENTES
+--==================================================
+
 for _, Object in ipairs(workspace:GetDescendants()) do
 
     if Object:IsA("ProximityPrompt") then
-        RegisterPrompt(Object)
+        SetPrompt(Object)
     end
 end
+
+--==================================================
+-- NOVOS PROMPTS / OBJETOS
+--==================================================
 
 workspace.DescendantAdded:Connect(function(Object)
 
     if Object:IsA("ProximityPrompt") then
-        RegisterPrompt(Object)
+        SetPrompt(Object)
     end
 end)
 
 workspace.DescendantRemoving:Connect(function(Object)
 
     if Object:IsA("ProximityPrompt") then
-        UnregisterPrompt(Object)
+        RemovePrompt(Object)
     end
 end)
 
 --==================================================
--- CÍRCULO
+-- ESTADOS PARA RESTAURAR
 --==================================================
 
-local CircleFolder = Instance.new("Folder")
-CircleFolder.Name = "TesteCircle"
-CircleFolder.Parent = workspace
+local DisabledObjects = {}
 
-local CircleParts = {}
-local CurrentRadius = 0
+local OldGlobalShadows = Lighting.GlobalShadows
+local OldDiffuse = Lighting.EnvironmentDiffuseScale
+local OldSpecular = Lighting.EnvironmentSpecularScale
 
-local function DestroyCircle()
+--==================================================
+-- OTIMIZAÇÃO INDIVIDUAL
+--==================================================
 
-    for _, Part in ipairs(CircleParts) do
+local function Disable(Object)
 
-        if Part and Part.Parent then
-            Part:Destroy()
-        end
+    if not Object.Enabled then
+        return
     end
 
-    table.clear(CircleParts)
-    CurrentRadius = 0
+    DisabledObjects[Object] = true
+
+    pcall(function()
+        Object.Enabled = false
+    end)
 end
 
-local function CreateCircle(Radius)
+local function Optimize(Object)
 
-    DestroyCircle()
+    if Object:IsA("ParticleEmitter") then
 
-    CurrentRadius = Radius
-
-    local Length =
-        (2 * math.pi * Radius) / CIRCLE_SEGMENTS
-
-    for i = 1, CIRCLE_SEGMENTS do
-
-        local Part = Instance.new("Part")
-
-        Part.Name = "CircleSegment"
-
-        Part.Anchored = true
-
-        Part.CanCollide = false
-        Part.CanTouch = false
-        Part.CanQuery = false
-
-        Part.CastShadow = false
-
-        Part.Material = Enum.Material.Neon
-        Part.Color = Color3.fromRGB(255, 255, 255)
-
-        Part.Transparency = 0.15
-
-        Part.Size = Vector3.new(
-            Length + 0.04,
-            CIRCLE_HEIGHT,
-            CIRCLE_THICKNESS
-        )
-
-        Part.Parent = CircleFolder
-
-        CircleParts[i] = Part
-    end
-end
-
-local function UpdateCircle(Position, Radius)
-
-    if #CircleParts ~= CIRCLE_SEGMENTS
-        or math.abs(CurrentRadius - Radius) > 0.5 then
-
-        CreateCircle(Radius)
+        Disable(Object)
+        return
     end
 
-    local Length =
-        (2 * math.pi * Radius) / CIRCLE_SEGMENTS
+    if Object:IsA("Trail") then
 
-    for i, Part in ipairs(CircleParts) do
-
-        if not Part.Parent then
-            return
-        end
-
-        local A1 =
-            ((i - 1) / CIRCLE_SEGMENTS) * math.pi * 2
-
-        local A2 =
-            (i / CIRCLE_SEGMENTS) * math.pi * 2
-
-        local P1 = Vector3.new(
-            Position.X + math.cos(A1) * Radius,
-            Position.Y,
-            Position.Z + math.sin(A1) * Radius
-        )
-
-        local P2 = Vector3.new(
-            Position.X + math.cos(A2) * Radius,
-            Position.Y,
-            Position.Z + math.sin(A2) * Radius
-        )
-
-        Part.Size = Vector3.new(
-            Length + 0.04,
-            CIRCLE_HEIGHT,
-            CIRCLE_THICKNESS
-        )
-
-        Part.CFrame =
-            CFrame.lookAt(
-                (P1 + P2) / 2,
-                P2
-            )
-            * CFrame.Angles(0, math.pi / 2, 0)
-    end
-end
-
---==================================================
--- POSIÇÃO DO PROMPT
---==================================================
-
-local function GetPromptPosition(Prompt)
-
-    local Parent = Prompt.Parent
-
-    if not Parent then
-        return nil
+        Disable(Object)
+        return
     end
 
-    if Parent:IsA("Attachment") then
-        return Parent.WorldPosition
+    if Object:IsA("Beam") then
+
+        Disable(Object)
+        return
     end
 
-    if Parent:IsA("BasePart") then
-        return Parent.Position
+    if Object:IsA("Smoke") then
+
+        Disable(Object)
+        return
     end
 
-    return nil
-end
+    if Object:IsA("Fire") then
 
---==================================================
--- OTIMIZAÇÃO VISUAL LOCAL
---==================================================
+        Disable(Object)
+        return
+    end
 
-local Optimization = {
-    Enabled = {},
-    GlobalShadows = nil
-}
+    if Object:IsA("Sparkles") then
 
-local function OptimizeObject(Object)
+        Disable(Object)
+        return
+    end
 
-    if Object:IsA("ParticleEmitter")
-        or Object:IsA("Trail")
-        or Object:IsA("Beam")
-        or Object:IsA("Smoke")
-        or Object:IsA("Fire")
-        or Object:IsA("Sparkles")
-        or Object:IsA("PointLight")
+    if Object:IsA("PointLight")
         or Object:IsA("SpotLight")
-        or Object:IsA("SurfaceLight")
-        or Object:IsA("BloomEffect")
+        or Object:IsA("SurfaceLight") then
+
+        Disable(Object)
+        return
+    end
+
+    if Object:IsA("BloomEffect")
         or Object:IsA("BlurEffect")
         or Object:IsA("ColorCorrectionEffect")
         or Object:IsA("DepthOfFieldEffect")
         or Object:IsA("SunRaysEffect") then
 
-        if Optimization.Enabled[Object] == nil then
-
-            Optimization.Enabled[Object] =
-                Object.Enabled
-        end
-
-        Object.Enabled = false
-    end
-end
-
-local function OptimizeClient()
-
-    for _, Object in ipairs(game:GetDescendants()) do
-
-        if not TestEnabled then
-            break
-        end
-
-        pcall(function()
-            OptimizeObject(Object)
-        end)
-    end
-
-    if TestEnabled then
-
-        if Optimization.GlobalShadows == nil then
-
-            Optimization.GlobalShadows =
-                Lighting.GlobalShadows
-        end
-
-        pcall(function()
-            Lighting.GlobalShadows = false
-        end)
-    end
-end
-
-local function RestoreClient()
-
-    for Object, Value in pairs(Optimization.Enabled) do
-
-        if Object and Object.Parent then
-
-            pcall(function()
-                Object.Enabled = Value
-            end)
-        end
-    end
-
-    table.clear(Optimization.Enabled)
-
-    if Optimization.GlobalShadows ~= nil then
-
-        pcall(function()
-            Lighting.GlobalShadows =
-                Optimization.GlobalShadows
-        end)
-
-        Optimization.GlobalShadows = nil
+        Disable(Object)
+        return
     end
 end
 
 --==================================================
--- PROMPT MAIS PRÓXIMO
+-- ULTRA OTIMIZAÇÃO
 --==================================================
 
-local function GetNearestPrompt()
+local function OptimizeGame()
 
-    local CurrentCharacter =
-        LocalPlayer.Character
-
-    if not CurrentCharacter then
-        return nil
+    if not Enabled then
+        return
     end
 
-    local CurrentRoot =
-        CurrentCharacter:FindFirstChild(
-            "HumanoidRootPart"
-        )
+    -- Uma única varredura.
+    local Objects =
+        game:GetDescendants()
 
-    if not CurrentRoot then
-        return nil
-    end
+    for i = 1, #Objects do
 
-    local Nearest = nil
-    local NearestDistance = math.huge
+        if not Enabled then
+            return
+        end
 
-    for Prompt in pairs(Prompts) do
+        Optimize(Objects[i])
 
-        if Prompt
-            and Prompt.Parent
-            and Prompt.Enabled then
-
-            local Position =
-                GetPromptPosition(Prompt)
-
-            if Position then
-
-                local Distance =
-                    (CurrentRoot.Position - Position).Magnitude
-
-                if Distance < NearestDistance then
-
-                    NearestDistance = Distance
-                    Nearest = Prompt
-                end
-            end
+        -- Divide a tarefa em pequenos lotes.
+        -- Isso evita congelar o celular.
+        if i % 150 == 0 then
+            task.wait()
         end
     end
 
-    return Nearest
-end
-
---==================================================
--- MOVIMENTO
---==================================================
-
-local GoingToPrompt = false
-
-local MovementConnection = nil
-local InputConnections = {}
-
-local MovementToken = 0
-
-local function DisconnectMovementInputs()
-
-    for _, Connection in ipairs(InputConnections) do
-
-        if Connection then
-            Connection:Disconnect()
-        end
-    end
-
-    table.clear(InputConnections)
-end
-
-local function StopMovement()
-
-    MovementToken += 1
-
-    GoingToPrompt = false
-
-    if MovementConnection then
-
-        MovementConnection:Disconnect()
-        MovementConnection = nil
-    end
-
-    DisconnectMovementInputs()
-
-    local CurrentCharacter =
-        LocalPlayer.Character
-
-    if CurrentCharacter then
-
-        local CurrentHumanoid =
-            CurrentCharacter:FindFirstChildOfClass(
-                "Humanoid"
-            )
-
-        local CurrentRoot =
-            CurrentCharacter:FindFirstChild(
-                "HumanoidRootPart"
-            )
-
-        if CurrentHumanoid
-            and CurrentRoot then
-
-            pcall(function()
-                CurrentHumanoid:Move(
-                    Vector3.zero,
-                    false
-                )
-            end)
-        end
-    end
-
-    NearButton.Text =
-        "IR ATÉ O MAIS PERTO"
-end
-
-local function FinishMovement()
-
-    GoingToPrompt = false
-
-    if MovementConnection then
-
-        MovementConnection:Disconnect()
-        MovementConnection = nil
-    end
-
-    DisconnectMovementInputs()
-
-    NearButton.Text =
-        "IR ATÉ O MAIS PERTO"
-end
-
-local function StartMovement(Prompt)
-
-    if GoingToPrompt then
+    if not Enabled then
         return
     end
 
-    local TargetPosition =
-        GetPromptPosition(Prompt)
-
-    if not TargetPosition then
-        return
-    end
-
-    local CurrentCharacter =
-        LocalPlayer.Character
-
-    if not CurrentCharacter then
-        return
-    end
-
-    local CurrentHumanoid =
-        CurrentCharacter:FindFirstChildOfClass(
-            "Humanoid"
-        )
-
-    local CurrentRoot =
-        CurrentCharacter:FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    if not CurrentHumanoid
-        or not CurrentRoot then
-        return
-    end
-
-    GoingToPrompt = true
-
-    MovementToken += 1
-
-    local MyToken = MovementToken
-
-    NearButton.Text = "INDO..."
-
-    local StartTime = os.clock()
-
     --==================================================
-    -- INTERFERÊNCIA DE TECLADO
-    --==================================================
-
-    table.insert(
-        InputConnections,
-
-        UserInputService.InputBegan:Connect(
-            function(Input, GameProcessed)
-
-                if not GoingToPrompt
-                    or MyToken ~= MovementToken then
-                    return
-                end
-
-                if GameProcessed then
-                    return
-                end
-
-                if Input.KeyCode == Enum.KeyCode.W
-                    or Input.KeyCode == Enum.KeyCode.A
-                    or Input.KeyCode == Enum.KeyCode.S
-                    or Input.KeyCode == Enum.KeyCode.D
-                    or Input.KeyCode == Enum.KeyCode.Space then
-
-                    StopMovement()
-                end
-            end
-        )
-    )
-
-    --==================================================
-    -- GAMEPAD
-    --==================================================
-
-    table.insert(
-        InputConnections,
-
-        UserInputService.InputChanged:Connect(
-            function(Input)
-
-                if not GoingToPrompt
-                    or MyToken ~= MovementToken then
-                    return
-                end
-
-                if Input.UserInputType ==
-                    Enum.UserInputType.Gamepad1 then
-
-                    if Input.KeyCode ==
-                        Enum.KeyCode.Thumbstick1 then
-
-                        local Position =
-                            Input.Position
-
-                        if math.abs(Position.X) > 0.15
-                            or math.abs(Position.Y) > 0.15 then
-
-                            StopMovement()
-                        end
-                    end
-                end
-            end
-        )
-    )
-
-    --==================================================
-    -- TOUCH
-    --==================================================
-
-    table.insert(
-        InputConnections,
-
-        UserInputService.TouchPan:Connect(
-            function(
-                TouchPositions,
-                TotalTranslation,
-                Velocity,
-                State
-            )
-
-                if not GoingToPrompt
-                    or MyToken ~= MovementToken then
-                    return
-                end
-
-                if State ==
-                    Enum.UserInputState.Change then
-
-                    if TotalTranslation.Magnitude > 3 then
-
-                        StopMovement()
-                    end
-                end
-            end
-        )
-    )
-
-    --==================================================
-    -- COMEÇA A ANDAR
+    -- LIGHTING
     --==================================================
 
     pcall(function()
-        CurrentHumanoid:MoveTo(
-            TargetPosition
-        )
+        Lighting.GlobalShadows = false
     end)
 
-    --==================================================
-    -- MONITORAMENTO
-    --==================================================
+    pcall(function()
+        Lighting.EnvironmentDiffuseScale = 0
+    end)
 
-    MovementConnection =
-        RunService.Heartbeat:Connect(function()
-
-            if not GoingToPrompt then
-                return
-            end
-
-            if MyToken ~= MovementToken then
-                return
-            end
-
-            -- Pega o personagem ATUAL.
-            local NewCharacter =
-                LocalPlayer.Character
-
-            if not NewCharacter then
-
-                StopMovement()
-                return
-            end
-
-            local NewHumanoid =
-                NewCharacter:FindFirstChildOfClass(
-                    "Humanoid"
-                )
-
-            local NewRoot =
-                NewCharacter:FindFirstChild(
-                    "HumanoidRootPart"
-                )
-
-            -- Resetou / personagem mudou
-            if NewCharacter ~= CurrentCharacter then
-
-                StopMovement()
-                return
-            end
-
-            if not NewHumanoid
-                or not NewRoot then
-
-                StopMovement()
-                return
-            end
-
-            if not Prompt.Parent then
-
-                StopMovement()
-                return
-            end
-
-            local Distance =
-                (NewRoot.Position - TargetPosition).Magnitude
-
-            if Distance <= 3 then
-
-                FinishMovement()
-                return
-            end
-
-            if os.clock() - StartTime >= 10 then
-
-                StopMovement()
-                return
-            end
-        end)
+    pcall(function()
+        Lighting.EnvironmentSpecularScale = 0
+    end)
 end
 
 --==================================================
--- BOTÃO IR
+-- OTIMIZAR SOMENTE OBJETOS NOVOS
 --==================================================
 
-NearButton.Activated:Connect(function()
+game.DescendantAdded:Connect(function(Object)
 
-    if GoingToPrompt then
+    if not Enabled then
         return
     end
 
-    local Prompt =
-        GetNearestPrompt()
+    -- Não faz nova varredura.
+    -- Só verifica o objeto que acabou de aparecer.
+    task.defer(function()
 
-    if not Prompt then
-        return
-    end
-
-    StartMovement(Prompt)
+        if Enabled and Object.Parent then
+            Optimize(Object)
+        end
+    end)
 end)
 
 --==================================================
--- TESTE
+-- ATIVAR DELAY ZERO
 --==================================================
 
-local function EnableTest()
+local function Enable()
 
-    TestEnabled = true
+    if Enabled then
+        return
+    end
 
-    TestButton.Text =
-        "TESTE: ON"
+    Enabled = true
 
+    Button.Text =
+        "TIRAR DELAY: ON"
+
+    -- Prompts atuais
     for Prompt in pairs(Prompts) do
 
         if Prompt and Prompt.Parent then
-
-            if OriginalHoldDuration[Prompt] == nil then
-
-                OriginalHoldDuration[Prompt] =
-                    Prompt.HoldDuration
-            end
 
             pcall(function()
                 Prompt.HoldDuration = 0
@@ -853,184 +335,83 @@ local function EnableTest()
         end
     end
 
-    task.spawn(function()
-        OptimizeClient()
-    end)
+    -- Otimização pesada apenas uma vez.
+    task.spawn(OptimizeGame)
 end
 
-local function DisableTest()
+--==================================================
+-- DESATIVAR
+--==================================================
 
-    TestEnabled = false
+local function DisableOptimization()
 
-    TestButton.Text =
-        "TESTE: OFF"
+    Enabled = false
 
-    DestroyCircle()
+    Button.Text =
+        "TIRAR DELAY: OFF"
 
-    for Prompt, Original in pairs(OriginalHoldDuration) do
+    -- Restaurar efeitos
+    for Object in pairs(DisabledObjects) do
 
-        if Prompt and Prompt.Parent then
+        if Object and Object.Parent then
 
             pcall(function()
-                Prompt.HoldDuration = Original
+                Object.Enabled = true
             end)
         end
     end
 
-    RestoreClient()
+    table.clear(DisabledObjects)
+
+    pcall(function()
+        Lighting.GlobalShadows =
+            OldGlobalShadows
+    end)
+
+    pcall(function()
+        Lighting.EnvironmentDiffuseScale =
+            OldDiffuse
+    end)
+
+    pcall(function()
+        Lighting.EnvironmentSpecularScale =
+            OldSpecular
+    end)
 end
 
-TestButton.Activated:Connect(function()
+--==================================================
+-- BOTÃO
+--==================================================
 
-    if TestEnabled then
-        DisableTest()
+Button.Activated:Connect(function()
+
+    if Enabled then
+        DisableOptimization()
     else
-        EnableTest()
+        Enable()
     end
 end)
 
 --==================================================
--- NOVOS EFEITOS
+-- RESPAWN
 --==================================================
 
-game.DescendantAdded:Connect(function(Object)
+Player.CharacterAdded:Connect(function(Character)
 
-    if not TestEnabled then
+    if not Enabled then
         return
     end
 
+    -- Só otimiza o personagem novo.
     task.defer(function()
 
-        if TestEnabled and Object.Parent then
+        for _, Object in ipairs(Character:GetDescendants()) do
 
-            pcall(function()
-                OptimizeObject(Object)
-            end)
+            if not Enabled then
+                return
+            end
+
+            Optimize(Object)
         end
     end)
-end)
-
---==================================================
--- LOOP DO TESTE
---==================================================
-
- local Timer = 0
-
-RunService.Heartbeat:Connect(function(DeltaTime)
-
-    if not TestEnabled then
-        return
-    end
-
-    Timer += DeltaTime
-
-    if Timer < PROMPT_INTERVAL then
-        return
-    end
-
-    Timer = 0
-
-    -- Sempre procura o personagem atual.
-    local CurrentCharacter =
-        LocalPlayer.Character
-
-    if not CurrentCharacter then
-        return
-    end
-
-    local CurrentRoot =
-        CurrentCharacter:FindFirstChild(
-            "HumanoidRootPart"
-        )
-
-    if not CurrentRoot then
-        return
-    end
-
-    local NearestPrompt =
-        GetNearestPrompt()
-
-    local Radius =
-        DEFAULT_RADIUS
-
-    if NearestPrompt then
-
-        Radius =
-            NearestPrompt.MaxActivationDistance
-    end
-
-    local CirclePosition =
-        Vector3.new(
-            CurrentRoot.Position.X,
-            CurrentRoot.Position.Y - 2.8,
-            CurrentRoot.Position.Z
-        )
-
-    UpdateCircle(
-        CirclePosition,
-        Radius
-    )
-end)
-
---==================================================
--- RESPAWN / CHARACTER ADDED
---==================================================
-
-LocalPlayer.CharacterAdded:Connect(function(NewCharacter)
-
-    -- Cancela somente o movimento atual.
-    -- NÃO desliga o TESTE.
-    if GoingToPrompt then
-        StopMovement()
-    end
-
-    -- Atualiza referências para o personagem novo.
-    UpdateCharacter(NewCharacter)
-
-    task.wait(1)
-
-    if TestEnabled then
-
-        -- Reaplica HoldDuration = 0
-        for Prompt in pairs(Prompts) do
-
-            if Prompt and Prompt.Parent then
-
-                pcall(function()
-                    Prompt.HoldDuration = 0
-                end)
-            end
-        end
-
-        -- Recria o círculo
-        if #CircleParts == 0 then
-            CreateCircle(DEFAULT_RADIUS)
-        end
-
-        -- Reaplica otimização nos efeitos existentes
-        task.spawn(function()
-
-            if TestEnabled then
-                OptimizeClient()
-            end
-        end)
-    end
-end)
-
---==================================================
--- CHARACTER REMOVING
---==================================================
-
-LocalPlayer.CharacterRemoving:Connect(function()
-
-    -- Não desliga o TESTE.
-    -- Apenas invalida o movimento atual.
-
-    if GoingToPrompt then
-        StopMovement()
-    end
-
-    Character = nil
-    Humanoid = nil
-    Root = nil
 end)
