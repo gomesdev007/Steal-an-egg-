@@ -8,7 +8,7 @@ local UserInputService = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 
 --==================================================
--- CONFIG
+-- CONFG
 --==================================================
 
 local RADIUS = 200
