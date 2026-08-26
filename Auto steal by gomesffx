@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
@@ -15,6 +16,54 @@ local movimentoToken = 0
 
 local controles = nil
 local controlsDisabled = false
+
+--==================================================
+-- AUTO STEAL PROMPTS
+--==================================================
+
+local promptDelays = {}
+local autoStealConnection = nil
+local promptCheckConnection = nil
+
+local function zerarDelayPrompt(prompt)
+
+    if not prompt or not prompt:IsA("ProximityPrompt") then
+        return
+    end
+
+    if promptDelays[prompt] == nil then
+        promptDelays[prompt] = prompt.HoldDuration
+    end
+
+    prompt.HoldDuration = 0
+end
+
+local function restaurarDelayPrompts()
+
+    for prompt, delay in pairs(promptDelays) do
+
+        if prompt and prompt.Parent then
+            pcall(function()
+                prompt.HoldDuration = delay
+            end)
+        end
+
+    end
+
+    table.clear(promptDelays)
+end
+
+local function prepararTodosPrompts()
+
+    for _, object in ipairs(game:GetDescendants()) do
+
+        if object:IsA("ProximityPrompt") then
+            zerarDelayPrompt(object)
+        end
+
+    end
+
+end
 
 --==================================================
 -- GET PLAYER CONTROLS
@@ -52,7 +101,6 @@ local function obterControles()
     end
 
     return nil
-
 end
 
 --==================================================
@@ -258,7 +306,6 @@ local function pegar()
     end
 
     return nil
-
 end
 
 --==================================================
@@ -371,7 +418,7 @@ local function liberarControles()
 end
 
 --==================================================
--- RESET BUTTON UI
+-- UPDATE UI
 --==================================================
 
 local function atualizarUI(inativo)
@@ -397,7 +444,27 @@ local function atualizarUI(inativo)
 end
 
 --==================================================
--- DISABLE AUTO STEAL
+-- STOP AUTO STEAL
+--==================================================
+
+local function pararAutoSteal()
+
+    if autoStealConnection then
+        autoStealConnection:Disconnect()
+        autoStealConnection = nil
+    end
+
+    if promptCheckConnection then
+        promptCheckConnection:Disconnect()
+        promptCheckConnection = nil
+    end
+
+    restaurarDelayPrompts()
+
+end
+
+--==================================================
+-- DISABLE
 --==================================================
 
 local function desativar()
@@ -427,7 +494,32 @@ local function desativar()
 end
 
 --==================================================
--- ENABLE AUTO STEAL
+-- MOVEMENT INTERRUPTION
+--==================================================
+
+local function movimentoInterrompido(humanoid)
+
+    if not humanoid or not humanoid.Parent then
+        return true
+    end
+
+    local state = humanoid:GetState()
+
+    if state == Enum.HumanoidStateType.Ragdoll
+        or state == Enum.HumanoidStateType.FallingDown
+        or state == Enum.HumanoidStateType.Physics
+        or state == Enum.HumanoidStateType.PlatformStanding
+        or state == Enum.HumanoidStateType.Seated
+        or state == Enum.HumanoidStateType.Dead then
+
+        return true
+    end
+
+    return false
+end
+
+--==================================================
+-- START MOVEMENT
 --==================================================
 
 local function iniciar()
@@ -446,18 +538,10 @@ local function iniciar()
 
     removerOrientacao()
 
-    --==================================================
-    -- DISABLE PLAYER CONTROL
-    --==================================================
-
     bloquearControles()
 
     humanoid.AutoRotate = false
     humanoid.Jump = false
-
-    --==================================================
-    -- ORIENTATION
-    --==================================================
 
     attachment = Instance.new("Attachment")
     attachment.Name = "AutoStealDirectionAttachment"
@@ -491,17 +575,9 @@ local function iniciar()
 
     end
 
-    --==================================================
-    -- MOVEMENT TOKEN
-    --==================================================
-
     movimentoToken += 1
 
     local meuToken = movimentoToken
-
-    --==================================================
-    -- MOVEMENT
-    --==================================================
 
     task.spawn(function()
 
@@ -519,15 +595,24 @@ local function iniciar()
                 break
             end
 
+            if movimentoInterrompido(humanoid) then
+
+                humanoid:Move(Vector3.zero, true)
+                humanoid.Jump = false
+
+                movimentoToken += 1
+
+                removerOrientacao()
+                liberarControles()
+
+                break
+            end
+
             humanoid.Jump = false
 
             pararCaminhada(humanoid)
 
             local distancia = (root.Position - POS2).Magnitude
-
-            --==================================================
-            -- ARRIVED
-            --==================================================
 
             if distancia <= 3 then
 
@@ -539,17 +624,9 @@ local function iniciar()
 
             end
 
-            --==================================================
-            -- KEEP CONTROLS DISABLED
-            --==================================================
-
             if not controlsDisabled then
                 bloquearControles()
             end
-
-            --==================================================
-            -- MOVE
-            --==================================================
 
             humanoid:MoveTo(POS2)
 
@@ -569,7 +646,116 @@ local function iniciar()
 end
 
 --==================================================
--- MANUAL BUTTON
+-- AUTO STEAL - CHECK ONLY NEAR PROMPTS
+--==================================================
+
+local function iniciarAutoSteal()
+
+    pararAutoSteal()
+
+    prepararTodosPrompts()
+
+    -- Novos prompts também recebem HoldDuration = 0
+    autoStealConnection = game.DescendantAdded:Connect(function(object)
+
+        if not autoLeft then
+            return
+        end
+
+        if object:IsA("ProximityPrompt") then
+            zerarDelayPrompt(object)
+        end
+
+    end)
+
+    -- Verificação somente dos prompts que estão no alcance
+    promptCheckConnection = RunService.Heartbeat:Connect(function()
+
+        if not autoLeft then
+            return
+        end
+
+        local character, humanoid, root = pegar()
+
+        if not character or not humanoid or not root then
+            return
+        end
+
+        for _, object in ipairs(game:GetDescendants()) do
+
+            if not autoLeft then
+                break
+            end
+
+            if object:IsA("ProximityPrompt") then
+
+                if object.Enabled then
+
+                    local adornee = object.Parent
+
+                    if adornee then
+
+                        local promptPosition
+
+                        if adornee:IsA("BasePart") then
+
+                            promptPosition = adornee.Position
+
+                        elseif adornee:IsA("Attachment") then
+
+                            promptPosition = adornee.WorldPosition
+
+                        elseif adornee:IsA("Model") then
+
+                            local primary = adornee.PrimaryPart
+
+                            if primary then
+                                promptPosition = primary.Position
+                            end
+
+                        end
+
+                        if promptPosition then
+
+                            local distancia =
+                                (root.Position - promptPosition).Magnitude
+
+                            local alcance = object.MaxActivationDistance
+
+                            -- Só completa quando realmente estiver
+                            -- dentro do alcance do próprio prompt.
+                            if distancia <= alcance then
+
+                                pcall(function()
+
+                                    if typeof(fireproximityprompt) == "function" then
+                                        fireproximityprompt(
+                                            object,
+                                            1,
+                                            true
+                                        )
+                                    end
+
+                                end)
+
+                            end
+
+                        end
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end)
+
+end
+
+--==================================================
+-- ENABLE BUTTON
 --==================================================
 
 button.Activated:Connect(function()
@@ -603,38 +789,16 @@ autoButton.Activated:Connect(function()
         autoButton.Text = "AUTO STEAL: ON"
         autoButton.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
+        iniciarAutoSteal()
+
     else
 
         autoButton.Text = "AUTO STEAL: OFF"
         autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 
+        pararAutoSteal()
+
     end
-
-end)
-
---==================================================
--- AUTO STEAL → PROXIMITY PROMPT
---==================================================
-
-ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredPlayer)
-
-    if triggeredPlayer ~= player then
-        return
-    end
-
-    if not autoLeft then
-        return
-    end
-
-    if ativo then
-        return
-    end
-
-    ativo = true
-
-    atualizarUI(false)
-
-    iniciar()
 
 end)
 
@@ -660,14 +824,13 @@ player.CharacterAdded:Connect(function(character)
     end
 
     if autoLeft then
-        -- Auto Steal remains enabled,
-        -- but movement only starts after another prompt.
+        prepararTodosPrompts()
     end
 
 end)
 
 --==================================================
--- CHARACTER REMOING
+-- CHARACTER REMOVING
 --==================================================
 
 player.CharacterRemoving:Connect(function()
