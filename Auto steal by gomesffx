@@ -15,7 +15,7 @@ local movimentoToken = 0
 local controles
 
 --==================================================
--- PLAYER CONTROLS
+-- PLAYER CONTROL
 --==================================================
 
 local function getControls()
