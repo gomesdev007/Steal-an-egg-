@@ -1,393 +1,500 @@
---// TIRAR DELAY
---// LocalScript
---// StarterPlayer > StarterPlayerScripts
-
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 
-local Player = Players.LocalPlayer
+local player = Players.LocalPlayer
+
+local POS2 = Vector3.new(514.74, 70.57, -365.25)
+
+local ativo = false
+local autoLeft = false
+
+local align
+local attachment
+local movimentoToken = 0
+
+local controles
 
 --==================================================
--- CONFG
+-- OBTER PLAYER CONTROLS
 --==================================================
 
-local RADIUS = 200
-local RADIUS_SQUARED = RADIUS * RADIUS
+local function obterControles()
 
--- Intervalo da verificação.
--- Não usa Heartbeat para evitar peso desnecessário.
-local CHECK_INTERVAL = 0.15
+    if controles then
+        return controles
+    end
 
-local Enabled = false
+    local playerScripts = player:WaitForChild("PlayerScripts")
+    local playerModule = playerScripts:WaitForChild("PlayerModule")
+    local module = require(playerModule)
 
--- Guarda o HoldDuration original de cada prompt
-local OriginalDuration = {}
+    controles = module:GetControls()
+
+    return controles
+end
 
 --==================================================
 -- GUI
 --==================================================
 
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TirarDelayUI"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui")
+gui.Name = "LeftMoveGui"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local Button = Instance.new("TextButton")
-Button.Name = "TirarDelay"
-Button.Size = UDim2.fromOffset(125, 38)
-Button.Position = UDim2.new(0, 20, 0.5, -19)
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromOffset(190, 132)
+frame.Position = UDim2.new(0.5, -95, 0.5, -66)
+frame.BackgroundColor3 = Color3.fromRGB(14, 14, 17)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
 
-Button.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-Button.BorderSizePixel = 0
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 14)
+frameCorner.Parent = frame
 
-Button.Text = "TIRAR DELAY"
-Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-Button.TextSize = 13
-Button.Font = Enum.Font.GothamBold
-
-Button.AutoButtonColor = false
-Button.Parent = ScreenGui
-
-local Corner = Instance.new("UICorner")
-Corner.CornerRadius = UDim.new(0, 10)
-Corner.Parent = Button
-
-local Stroke = Instance.new("UIStroke")
-Stroke.Color = Color3.fromRGB(45, 45, 45)
-Stroke.Thickness = 1
-Stroke.Parent = Button
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(45, 45, 52)
+stroke.Thickness = 1
+stroke.Transparency = 0.15
+stroke.Parent = frame
 
 --==================================================
--- ARRASTAR
+-- TÍTULO
 --==================================================
 
-local Dragging = false
-local DragStart
-local StartPosition
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 0, 25)
+title.Position = UDim2.fromOffset(10, 7)
+title.BackgroundTransparency = 1
+title.Text = "auto steal by @gomesffxpp7"
+title.TextColor3 = Color3.fromRGB(245, 245, 245)
+title.TextSize = 14
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = frame
 
-Button.InputBegan:Connect(function(Input)
+--==================================================
+-- STATUS LEFT MOVE
+--==================================================
 
-	if Input.UserInputType == Enum.UserInputType.MouseButton1
-		or Input.UserInputType == Enum.UserInputType.Touch then
+local status = Instance.new("TextLabel")
+status.Size = UDim2.fromOffset(110, 18)
+status.Position = UDim2.fromOffset(10, 29)
+status.BackgroundTransparency = 1
+status.Text = "off"
+status.TextColor3 = Color3.fromRGB(145, 145, 150)
+status.TextSize = 10
+status.Font = Enum.Font.GothamMedium
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Parent = frame
 
-		Dragging = true
-		DragStart = Input.Position
-		StartPosition = Button.Position
+--==================================================
+-- BOTÃO LEFT MOVE
+--==================================================
 
-	end
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(1, -20, 0, 34)
+button.Position = UDim2.fromOffset(10, 51)
+button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+button.BorderSizePixel = 0
+button.Text = "auto steal off"
+button.TextColor3 = Color3.fromRGB(235, 235, 235)
+button.TextSize = 12
+button.Font = Enum.Font.GothamBold
+button.AutoButtonColor = false
+button.Parent = frame
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 9)
+buttonCorner.Parent = button
+
+local buttonStroke = Instance.new("UIStroke")
+buttonStroke.Color = Color3.fromRGB(55, 55, 62)
+buttonStroke.Thickness = 1
+buttonStroke.Transparency = 0.2
+buttonStroke.Parent = button
+
+--==================================================
+-- BOTÃO AUTO LEFT
+--==================================================
+
+local autoButton = Instance.new("TextButton")
+autoButton.Size = UDim2.new(1, -20, 0, 34)
+autoButton.Position = UDim2.fromOffset(10, 91)
+autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+autoButton.BorderSizePixel = 0
+autoButton.Text = "auto steal off"
+autoButton.TextColor3 = Color3.fromRGB(235, 235, 235)
+autoButton.TextSize = 11
+autoButton.Font = Enum.Font.GothamBold
+autoButton.AutoButtonColor = false
+autoButton.Parent = frame
+
+local autoCorner = Instance.new("UICorner")
+autoCorner.CornerRadius = UDim.new(0, 9)
+autoCorner.Parent = autoButton
+
+local autoStroke = Instance.new("UIStroke")
+autoStroke.Color = Color3.fromRGB(55, 55, 62)
+autoStroke.Thickness = 1
+autoStroke.Transparency = 0.2
+autoStroke.Parent = autoButton
+
+--==================================================
+-- PEGAR PERSONAGEM
+--==================================================
+
+local function pegar()
+
+    local character = player.Character
+
+    if not character then
+        return
+    end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+
+    if humanoid and root then
+        return character, humanoid, root
+    end
+
+end
+
+--==================================================
+-- PARAR WALK/RUN
+--==================================================
+
+local function pararCaminhada(humanoid)
+
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+
+    if not animator then
+        return
+    end
+
+    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+
+        local nome = string.lower(track.Name)
+
+        if nome == "walk"
+            or nome == "walkanim"
+            or nome == "run"
+            or nome == "runanim"
+            or string.find(nome, "walk")
+            or string.find(nome, "run") then
+
+            track:Stop(0)
+
+        end
+
+    end
+
+end
+
+--==================================================
+-- REMOVER ORIENTAÇÃO
+--==================================================
+
+local function removerOrientacao()
+
+    if align then
+        align:Destroy()
+        align = nil
+    end
+
+    if attachment then
+        attachment:Destroy()
+        attachment = nil
+    end
+
+    local _, humanoid = pegar()
+
+    if humanoid then
+        humanoid.AutoRotate = true
+    end
+
+end
+
+--==================================================
+-- BLOQUEAR CONTROLES
+--==================================================
+
+local function bloquearControles()
+
+    local controls = obterControles()
+
+    if controls then
+        controls:Disable()
+    end
+
+end
+
+--==================================================
+-- LIBERAR CONTROLES
+--==================================================
+
+local function liberarControles()
+
+    local controls = obterControles()
+
+    if controls then
+        controls:Enable()
+    end
+
+end
+
+--==================================================
+-- DESATIVAR LEFT MOVE
+--==================================================
+
+local function desativar()
+
+    if not ativo then
+        liberarControles()
+        return
+    end
+
+    ativo = false
+
+    movimentoToken += 1
+
+    liberarControles()
+
+    local character, humanoid, root = pegar()
+
+    if humanoid and root then
+
+        humanoid:Move(Vector3.zero, true)
+        humanoid:MoveTo(root.Position)
+
+        humanoid.AutoRotate = true
+        humanoid.Jump = false
+
+    end
+
+    removerOrientacao()
+
+    button.Text = "activate"
+    button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+
+    status.Text = "disable"
+    status.TextColor3 = Color3.fromRGB(145, 145, 150)
+
+end
+
+--==================================================
+-- ATIVAR LEFT MOVE
+--==================================================
+
+local function iniciar()
+
+    removerOrientacao()
+
+    local character, humanoid, root = pegar()
+
+    if not character or not humanoid or not root then
+
+        ativo = false
+        liberarControles()
+
+        button.Text = "activate"
+        button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+
+        status.Text = "disable"
+        status.TextColor3 = Color3.fromRGB(145, 145, 150)
+
+        return
+
+    end
+
+    -- Bloqueia completamente o controle manual
+    bloquearControles()
+
+    humanoid.AutoRotate = false
+    humanoid.Jump = false
+
+    --==================================================
+    -- ORIENTAÇÃO
+    --==================================================
+
+    attachment = Instance.new("Attachment")
+    attachment.Name = "LeftDirectionAttachment"
+    attachment.Parent = root
+
+    align = Instance.new("AlignOrientation")
+    align.Name = "ForceLeftDirection"
+    align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    align.Attachment0 = attachment
+    align.RigidityEnabled = true
+    align.Responsiveness = 200
+    align.MaxTorque = math.huge
+    align.Parent = root
+
+    local forward = root.CFrame.LookVector
+
+    local left = Vector3.new(
+        forward.Z,
+        0,
+        -forward.X
+    )
+
+    if left.Magnitude > 0 then
+
+        left = left.Unit
+
+        align.CFrame = CFrame.lookAt(
+            Vector3.zero,
+            left
+        )
+
+    end
+
+    --==================================================
+    -- TOKEN
+    --==================================================
+
+    movimentoToken += 1
+
+    local meuToken = movimentoToken
+
+    --==================================================
+    -- MOVIMENTO
+    --==================================================
+
+    task.spawn(function()
+
+        while ativo
+            and meuToken == movimentoToken
+            and humanoid.Parent
+            and root.Parent do
+
+            -- Bloqueia qualquer tentativa de pulo
+            humanoid.Jump = false
+
+            -- Garante que o controle continue bloqueado
+            bloquearControles()
+
+            -- Mantém somente as animações Walk/Run paradas
+            pararCaminhada(humanoid)
+
+            local distancia = (root.Position - POS2).Magnitude
+
+            --==================================================
+            -- CHEGOU
+            --==================================================
+
+            if distancia <= 3 then
+
+                humanoid:Move(Vector3.zero, true)
+
+                desativar()
+
+                break
+
+            end
+
+            --==================================================
+            -- MOVIMENTO AUTOMÁTICO
+            --==================================================
+
+            humanoid:MoveTo(POS2)
+
+            task.wait(0.15)
+
+        end
+
+        if not ativo and humanoid.Parent then
+            humanoid:Move(Vector3.zero, true)
+        end
+
+    end)
+
+end
+
+--==================================================
+-- BOTÃO LEFT MOVE
+--==================================================
+
+button.MouseButton1Click:Connect(function()
+
+    if ativo then
+
+        desativar()
+
+    else
+
+        ativo = true
+
+        button.Text = "deactivated"
+        button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
+
+        status.Text = "activate"
+        status.TextColor3 = Color3.fromRGB(90, 220, 115)
+
+        iniciar()
+
+    end
 
 end)
 
-UserInputService.InputChanged:Connect(function(Input)
+--==================================================
+-- BOTÃO AUTO LEFT
+--==================================================
 
-	if not Dragging then
-		return
-	end
+autoButton.MouseButton1Click:Connect(function()
 
-	if Input.UserInputType == Enum.UserInputType.MouseMovement
-		or Input.UserInputType == Enum.UserInputType.Touch then
+    autoLeft = not autoLeft
 
-		local Delta = Input.Position - DragStart
+    if autoLeft then
 
-		Button.Position = UDim2.new(
-			StartPosition.X.Scale,
-			StartPosition.X.Offset + Delta.X,
+        autoButton.Text = "auto steal off"
+        autoButton.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
-			StartPosition.Y.Scale,
-			StartPosition.Y.Offset + Delta.Y
-		)
+    else
 
-	end
+        autoButton.Text = "auto steal on"
+        autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 
-end)
-
-UserInputService.InputEnded:Connect(function(Input)
-
-	if Input.UserInputType == Enum.UserInputType.MouseButton1
-		or Input.UserInputType == Enum.UserInputType.Touch then
-
-		Dragging = false
-
-	end
+    end
 
 end)
 
 --==================================================
--- ROOT DO JOGADOR
+-- AUTO LEFT → PROXIMITY PROMPT
 --==================================================
 
-local function GetRoot()
+ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredPlayer)
 
-	local Character = Player.Character
+    -- Só reage ao próprio jogador
+    if triggeredPlayer ~= player then
+        return
+    end
 
-	if not Character then
-		return nil
-	end
+    -- AUTO LEFT precisa estar ativado
+    if not autoLeft then
+        return
+    end
 
-	return Character:FindFirstChild("HumanoidRootPart")
-end
+    -- Se já está ativo, não reinicia
+    if ativo then
+        return
+    end
 
---==================================================
--- POSIÇÃO REAL DO PROMPT
---==================================================
+    -- Ativa automaticamente
+    ativo = true
 
-local function GetPromptPosition(Prompt)
+    button.Text = "disable "
+    button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
-	local Parent = Prompt.Parent
+    status.Text = "activated"
+    status.TextColor3 = Color3.fromRGB(90, 220, 115)
 
-	if not Parent then
-		return nil
-	end
-
-	-- Prompt diretamente dentro de uma Part
-	if Parent:IsA("BasePart") then
-		return Parent.Position
-	end
-
-	-- Prompt dentro de Attachment
-	if Parent:IsA("Attachment") then
-		return Parent.WorldPosition
-	end
-
-	-- Procura uma BasePart ancestral
-	local Part = Prompt:FindFirstAncestorWhichIsA("BasePart")
-
-	if Part then
-		return Part.Position
-	end
-
-	return nil
-end
-
---==================================================
--- RESTAURA PROMPT
---==================================================
-
-local function RestorePrompt(Prompt)
-
-	local Original = OriginalDuration[Prompt]
-
-	if Original == nil then
-		return
-	end
-
-	if Prompt.Parent then
-		Prompt.HoldDuration = Original
-	end
-
-	OriginalDuration[Prompt] = nil
-
-end
-
---==================================================
--- REMOVE DELAY
---==================================================
-
-local function RemoveDelay(Prompt)
-
-	if not Prompt:IsA("ProximityPrompt") then
-		return
-	end
-
-	if not Prompt.Parent then
-		OriginalDuration[Prompt] = nil
-		return
-	end
-
-	-- Guarda o valor original somente na primeira vez
-	if OriginalDuration[Prompt] == nil then
-		OriginalDuration[Prompt] = Prompt.HoldDuration
-	end
-
-	-- Só escreve quando necessário
-	if Prompt.HoldDuration ~= 0 then
-		Prompt.HoldDuration = 0
-	end
-
-end
-
---==================================================
--- ATUALIZAR PROMPTS
---==================================================
-
-local function UpdatePrompts()
-
-	if not Enabled then
-		return
-	end
-
-	local Root = GetRoot()
-
-	if not Root then
-		return
-	end
-
-	local PlayerPosition = Root.Position
-
-	--================================================
-	-- 1. VERIFICA OS QUE JÁ ESTÃO SENDO CONTROLADOS
-	--================================================
-
-	for Prompt in pairs(OriginalDuration) do
-
-		if not Prompt.Parent then
-
-			OriginalDuration[Prompt] = nil
-
-		else
-
-			local PromptPosition = GetPromptPosition(Prompt)
-
-			if PromptPosition then
-
-				local Offset = PromptPosition - PlayerPosition
-				local DistanceSquared = Offset:Dot(Offset)
-
-				-- Saiu dos 200 studs
-				if DistanceSquared > RADIUS_SQUARED then
-					RestorePrompt(Prompt)
-				end
-
-			else
-
-				RestorePrompt(Prompt)
-
-			end
-
-		end
-
-	end
-
-	--================================================
-	-- 2. PROCURA SOMENTE PARTES PRÓXIMAS
-	--================================================
-
-	local NearbyParts = workspace:GetPartBoundsInRadius(
-		PlayerPosition,
-		RADIUS
-	)
-
-	for _, Part in ipairs(NearbyParts) do
-
-		-- Verifica a própria Part
-		if Part:IsA("BasePart") then
-
-			local DirectPrompt = Part:FindFirstChildOfClass("ProximityPrompt")
-
-			if DirectPrompt then
-
-				local PromptPosition = GetPromptPosition(DirectPrompt)
-
-				if PromptPosition then
-
-					local Offset = PromptPosition - PlayerPosition
-
-					if Offset:Dot(Offset) <= RADIUS_SQUARED then
-						RemoveDelay(DirectPrompt)
-					end
-
-				end
-
-			end
-
-		end
-
-		-- Verifica prompts dentro de Attachments/objetos
-		for _, Object in ipairs(Part:GetDescendants()) do
-
-			if Object:IsA("ProximityPrompt") then
-
-				local PromptPosition = GetPromptPosition(Object)
-
-				if PromptPosition then
-
-					local Offset = PromptPosition - PlayerPosition
-
-					if Offset:Dot(Offset) <= RADIUS_SQUARED then
-						RemoveDelay(Object)
-					end
-
-				end
-
-			end
-
-		end
-
-	end
-
-end
-
---==================================================
--- DESATIVAR
---==================================================
-
-local function Disable()
-
-	Enabled = false
-
-	for Prompt, Original in pairs(OriginalDuration) do
-
-		if Prompt.Parent then
-			Prompt.HoldDuration = Original
-		end
-
-	end
-
-	table.clear(OriginalDuration)
-
-	Button.Text = "TIRAR DELAY"
-	Button.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-	Stroke.Color = Color3.fromRGB(45, 45, 45)
-
-end
-
---==================================================
--- ATIVAR
---==================================================
-
-local function Enable()
-
-	Enabled = true
-
-	Button.Text = "DELAY: ON"
-	Button.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-	Stroke.Color = Color3.fromRGB(80, 80, 80)
-
-	-- Faz uma atualização imediatamente
-	UpdatePrompts()
-
-end
-
---==================================================
--- BOTÃO
---==================================================
-
-Button.Activated:Connect(function()
-
-	if Enabled then
-		Disable()
-	else
-		Enable()
-	end
-
-end)
-
---==================================================
--- LOOP OTIMIZADO
---==================================================
-
-task.spawn(function()
-
-	while ScreenGui.Parent do
-
-		if Enabled then
-			UpdatePrompts()
-		end
-
-		task.wait(CHECK_INTERVAL)
-
-	end
+    iniciar()
 
 end)
 
@@ -395,10 +502,30 @@ end)
 -- RESPAWN
 --==================================================
 
-Player.CharacterAdded:Connect(function()
+player.CharacterAdded:Connect(function(character)
 
-	-- Os prompts continuam existindo no mapa,
-	-- mas limpamos as referências antigas.
-	table.clear(OriginalDuration)
+    liberarControles()
+
+    if align then
+        align:Destroy()
+        align = nil
+    end
+
+    if attachment then
+        attachment:Destroy()
+        attachment = nil
+    end
+
+    movimentoToken += 1
+
+    if ativo then
+
+        task.wait(1)
+
+        if ativo then
+            iniciar()
+        end
+
+    end
 
 end)
