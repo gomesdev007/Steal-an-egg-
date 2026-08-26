@@ -667,7 +667,7 @@ player.CharacterAdded:Connect(function(character)
 end)
 
 --==================================================
--- CHARACTER REMOVING
+-- CHARACTER REMOING
 --==================================================
 
 player.CharacterRemoving:Connect(function()
