@@ -17,7 +17,7 @@ local controles = nil
 local controlsDisabled = false
 
 --==================================================
--- AUTO STEAL
+-- AUTO STEL
 --==================================================
 
 local autoStealConnection = nil
