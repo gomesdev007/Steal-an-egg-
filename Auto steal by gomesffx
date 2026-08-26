@@ -30,7 +30,7 @@ local promptCooldown = {}
 local PROMPT_COOLDOWN = 0.15
 
 --==================================================
--- CONFIGURAR PROMPT
+-- CONFIGURAR POMPT
 --==================================================
 
 local function configurarPrompt(prompt)
