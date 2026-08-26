@@ -17,7 +17,7 @@ local controles = nil
 local controlsDisabled = false
 
 --==================================================
--- AUTO STEAL PROMPTS
+-- AUTO STEAL ROMPTS
 --==================================================
 
 local promptDelays = {}
