@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local POS2 = Vector3.new(514.74, 70.57, -365.25)
 
 local ativo = false
-local autoSteal = false
+local autoLeft = false
 
 local align
 local attachment
@@ -15,10 +15,10 @@ local movimentoToken = 0
 local controles
 
 --==================================================
--- PLAYER CONTROL
+-- GET PLAYER CONTROLS
 --==================================================
 
-local function getControls()
+local function obterControles()
 
     if controles then
         return controles
@@ -31,24 +31,7 @@ local function getControls()
     controles = module:GetControls()
 
     return controles
-end
 
-local function blockControls()
-
-    local controls = getControls()
-
-    if controls then
-        controls:Disable()
-    end
-end
-
-local function enableControls()
-
-    local controls = getControls()
-
-    if controls then
-        controls:Enable()
-    end
 end
 
 --==================================================
@@ -62,8 +45,8 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(200, 132)
-frame.Position = UDim2.new(0.5, -100, 0.5, -66)
+frame.Size = UDim2.fromOffset(190, 132)
+frame.Position = UDim2.new(0.5, -95, 0.5, -66)
 frame.BackgroundColor3 = Color3.fromRGB(14, 14, 17)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -74,21 +57,21 @@ local frameCorner = Instance.new("UICorner")
 frameCorner.CornerRadius = UDim.new(0, 14)
 frameCorner.Parent = frame
 
-local frameStroke = Instance.new("UIStroke")
-frameStroke.Color = Color3.fromRGB(45, 45, 52)
-frameStroke.Thickness = 1
-frameStroke.Transparency = 0.15
-frameStroke.Parent = frame
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(45, 45, 52)
+stroke.Thickness = 1
+stroke.Transparency = 0.15
+stroke.Parent = frame
 
 --==================================================
 -- TITLE
 --==================================================
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 22)
+title.Size = UDim2.new(1, -20, 0, 25)
 title.Position = UDim2.fromOffset(10, 7)
 title.BackgroundTransparency = 1
-title.Text = "AUTO STEAL"
+title.Text = "AUTO STEAL BY GOMESFFXP7"
 title.TextColor3 = Color3.fromRGB(245, 245, 245)
 title.TextSize = 14
 title.Font = Enum.Font.GothamBold
@@ -96,14 +79,14 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
 
 --==================================================
--- MANUAL STATUS
+-- STATUS
 --==================================================
 
 local status = Instance.new("TextLabel")
-status.Size = UDim2.fromOffset(170, 18)
-status.Position = UDim2.fromOffset(10, 28)
+status.Size = UDim2.fromOffset(110, 18)
+status.Position = UDim2.fromOffset(10, 29)
 status.BackgroundTransparency = 1
-status.Text = "MANUAL • OFF"
+status.Text = "● INACTIVE"
 status.TextColor3 = Color3.fromRGB(145, 145, 150)
 status.TextSize = 10
 status.Font = Enum.Font.GothamMedium
@@ -111,17 +94,17 @@ status.TextXAlignment = Enum.TextXAlignment.Left
 status.Parent = frame
 
 --==================================================
--- MANUAL BUTTON
+-- AUTO STEAL MANUAL BUTTON
 --==================================================
 
 local button = Instance.new("TextButton")
-button.Size = UDim2.new(1, -20, 0, 32)
-button.Position = UDim2.fromOffset(10, 49)
+button.Size = UDim2.new(1, -20, 0, 34)
+button.Position = UDim2.fromOffset(10, 51)
 button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 button.BorderSizePixel = 0
-button.Text = "START"
+button.Text = "ENABLE"
 button.TextColor3 = Color3.fromRGB(235, 235, 235)
-button.TextSize = 11
+button.TextSize = 12
 button.Font = Enum.Font.GothamBold
 button.AutoButtonColor = false
 button.Parent = frame
@@ -137,17 +120,17 @@ buttonStroke.Transparency = 0.2
 buttonStroke.Parent = button
 
 --==================================================
--- AUTO STATUS / BUTTON
+-- AUTO STEAL BUTTON
 --==================================================
 
 local autoButton = Instance.new("TextButton")
-autoButton.Size = UDim2.new(1, -20, 0, 32)
-autoButton.Position = UDim2.fromOffset(10, 88)
+autoButton.Size = UDim2.new(1, -20, 0, 34)
+autoButton.Position = UDim2.fromOffset(10, 91)
 autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 autoButton.BorderSizePixel = 0
-autoButton.Text = "AUTO STEAL AUTOMATIC • OFF"
+autoButton.Text = "AUTO STEAL: OFF"
 autoButton.TextColor3 = Color3.fromRGB(235, 235, 235)
-autoButton.TextSize = 10
+autoButton.TextSize = 11
 autoButton.Font = Enum.Font.GothamBold
 autoButton.AutoButtonColor = false
 autoButton.Parent = frame
@@ -163,10 +146,10 @@ autoStroke.Transparency = 0.2
 autoStroke.Parent = autoButton
 
 --==================================================
--- CHARACTER
+-- GET CHARACTER
 --==================================================
 
-local function getCharacter()
+local function pegar()
 
     local character = player.Character
 
@@ -180,13 +163,14 @@ local function getCharacter()
     if humanoid and root then
         return character, humanoid, root
     end
+
 end
 
 --==================================================
 -- STOP WALK/RUN ANIMATIONS
 --==================================================
 
-local function stopWalkAnimations(humanoid)
+local function pararCaminhada(humanoid)
 
     local animator = humanoid:FindFirstChildOfClass("Animator")
 
@@ -196,25 +180,28 @@ local function stopWalkAnimations(humanoid)
 
     for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
 
-        local name = string.lower(track.Name)
+        local nome = string.lower(track.Name)
 
-        if name == "walk"
-            or name == "walkanim"
-            or name == "run"
-            or name == "runanim"
-            or string.find(name, "walk")
-            or string.find(name, "run") then
+        if nome == "walk"
+            or nome == "walkanim"
+            or nome == "run"
+            or nome == "runanim"
+            or string.find(nome, "walk")
+            or string.find(nome, "run") then
 
             track:Stop(0)
+
         end
+
     end
+
 end
 
 --==================================================
 -- REMOVE ORIENTATION
 --==================================================
 
-local function removeOrientation()
+local function removerOrientacao()
 
     if align then
         align:Destroy()
@@ -226,21 +213,50 @@ local function removeOrientation()
         attachment = nil
     end
 
-    local _, humanoid = getCharacter()
+    local _, humanoid = pegar()
 
     if humanoid then
         humanoid.AutoRotate = true
     end
+
 end
 
 --==================================================
--- STOP AUTO STEAL
+-- DISABLE CONTROLS
 --==================================================
 
-local function stopAutoSteal()
+local function bloquearControles()
+
+    local controls = obterControles()
+
+    if controls then
+        controls:Disable()
+    end
+
+end
+
+--==================================================
+-- ENABLE CONTROLS
+--==================================================
+
+local function liberarControles()
+
+    local controls = obterControles()
+
+    if controls then
+        controls:Enable()
+    end
+
+end
+
+--==================================================
+-- DISABLE AUTO STEAL MANUAL
+--==================================================
+
+local function desativar()
 
     if not ativo then
-        enableControls()
+        liberarControles()
         return
     end
 
@@ -248,9 +264,9 @@ local function stopAutoSteal()
 
     movimentoToken += 1
 
-    enableControls()
+    liberarControles()
 
-    local _, humanoid, root = getCharacter()
+    local character, humanoid, root = pegar()
 
     if humanoid and root then
 
@@ -259,43 +275,46 @@ local function stopAutoSteal()
 
         humanoid.AutoRotate = true
         humanoid.Jump = false
+
     end
 
-    removeOrientation()
+    removerOrientacao()
 
-    button.Text = "START"
+    button.Text = "ENABLE"
     button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 
-    status.Text = "MANUAL • OFF"
+    status.Text = "● INACTIVE"
     status.TextColor3 = Color3.fromRGB(145, 145, 150)
+
 end
 
 --==================================================
--- START AUTO STEAL
+-- ENABLE AUTO STEAL MANUAL
 --==================================================
 
-local function startAutoSteal()
+local function iniciar()
 
-    removeOrientation()
+    removerOrientacao()
 
-    local character, humanoid, root = getCharacter()
+    local character, humanoid, root = pegar()
 
     if not character or not humanoid or not root then
 
         ativo = false
-        enableControls()
+        liberarControles()
 
-        button.Text = "START"
+        button.Text = "ENABLE"
         button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 
-        status.Text = "MANUAL • OFF"
+        status.Text = "● INACTIVE"
         status.TextColor3 = Color3.fromRGB(145, 145, 150)
 
         return
+
     end
 
-    -- Block player controls
-    blockControls()
+    -- Disable manual movement
+    bloquearControles()
 
     humanoid.AutoRotate = false
     humanoid.Jump = false
@@ -305,11 +324,11 @@ local function startAutoSteal()
     --==================================================
 
     attachment = Instance.new("Attachment")
-    attachment.Name = "AutoStealAttachment"
+    attachment.Name = "AutoStealDirectionAttachment"
     attachment.Parent = root
 
     align = Instance.new("AlignOrientation")
-    align.Name = "AutoStealOrientation"
+    align.Name = "ForceAutoStealDirection"
     align.Mode = Enum.OrientationAlignmentMode.OneAttachment
     align.Attachment0 = attachment
     align.RigidityEnabled = true
@@ -333,15 +352,16 @@ local function startAutoSteal()
             Vector3.zero,
             left
         )
+
     end
 
     --==================================================
-    -- MOVEMENT TOKEN
+    -- TOKEN
     --==================================================
 
     movimentoToken += 1
 
-    local myToken = movimentoToken
+    local meuToken = movimentoToken
 
     --==================================================
     -- MOVEMENT
@@ -350,32 +370,43 @@ local function startAutoSteal()
     task.spawn(function()
 
         while ativo
-            and myToken == movimentoToken
+            and meuToken == movimentoToken
             and humanoid.Parent
             and root.Parent do
 
+            -- Prevent jumping
             humanoid.Jump = false
 
-            blockControls()
+            -- Keep manual controls disabled
+            bloquearControles()
 
-            stopWalkAnimations(humanoid)
+            -- Keep Walk/Run animations stopped
+            pararCaminhada(humanoid)
 
-            local distance = (root.Position - POS2).Magnitude
+            local distancia = (root.Position - POS2).Magnitude
 
-            -- Reached destination
-            if distance <= 3 then
+            --==================================================
+            -- ARRIVED
+            --==================================================
+
+            if distancia <= 3 then
 
                 humanoid:Move(Vector3.zero, true)
 
-                stopAutoSteal()
+                desativar()
 
                 break
+
             end
 
-            -- Script movement only
+            --==================================================
+            -- AUTO MOVEMENT
+            --==================================================
+
             humanoid:MoveTo(POS2)
 
             task.wait(0.15)
+
         end
 
         if not ativo and humanoid.Parent then
@@ -383,89 +414,98 @@ local function startAutoSteal()
         end
 
     end)
+
 end
 
 --==================================================
--- MANUAL BUTTON
+-- AUTO STEAL MANUAL BUTTON
 --==================================================
 
 button.MouseButton1Click:Connect(function()
 
     if ativo then
 
-        stopAutoSteal()
+        desativar()
 
     else
 
         ativo = true
 
-        button.Text = "STOP"
+        button.Text = "DISABLE"
         button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
-        status.Text = "MANUAL • ON"
+        status.Text = "● ACTIVE"
         status.TextColor3 = Color3.fromRGB(90, 220, 115)
 
-        startAutoSteal()
+        iniciar()
+
     end
+
 end)
 
 --==================================================
--- AUTOMATIC BUTTON
+-- AUTO STEAL BUTTON
 --==================================================
 
 autoButton.MouseButton1Click:Connect(function()
 
-    autoSteal = not autoSteal
+    autoLeft = not autoLeft
 
-    if autoSteal then
+    if autoLeft then
 
-        autoButton.Text = "AUTO STEAL AUTOMATIC • ON"
+        autoButton.Text = "AUTO STEAL: ON"
         autoButton.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
     else
 
-        autoButton.Text = "AUTO STEAL AUTOMATIC • OFF"
+        autoButton.Text = "AUTO STEAL: OFF"
         autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 
     end
+
 end)
 
 --==================================================
--- PROMPT TRIGGER
+-- AUTO STEAL → PROXIMITY PROMPT
 --==================================================
 
 ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredPlayer)
 
+    -- Only react to the local player
     if triggeredPlayer ~= player then
         return
     end
 
-    if not autoSteal then
+    -- Auto Steal must be enabled
+    if not autoLeft then
         return
     end
 
+    -- Don't restart if already active
     if ativo then
         return
     end
 
+    -- Start automatically
     ativo = true
 
-    button.Text = "STOP"
+    button.Text = "DISABLE"
     button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
-    status.Text = "MANUAL • ON"
+    status.Text = "● ACTIVE"
     status.TextColor3 = Color3.fromRGB(90, 220, 115)
 
-    startAutoSteal()
+    iniciar()
+
 end)
 
 --==================================================
 -- RESPAWN
 --==================================================
 
-player.CharacterAdded:Connect(function()
+player.CharacterAdded:Connect(function(character)
 
-    enableControls()
+    liberarControles()
 
     if align then
         align:Destroy()
@@ -484,7 +524,9 @@ player.CharacterAdded:Connect(function()
         task.wait(1)
 
         if ativo then
-            startAutoSteal()
+            iniciar()
         end
+
     end
+
 end)
