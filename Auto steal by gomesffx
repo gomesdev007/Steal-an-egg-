@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
@@ -8,11 +9,12 @@ local POS2 = Vector3.new(514.74, 70.57, -365.25)
 local ativo = false
 local autoLeft = false
 
-local align
-local attachment
+local align = nil
+local attachment = nil
 local movimentoToken = 0
 
-local controles
+local controles = nil
+local controlsDisabled = false
 
 --==================================================
 -- GET PLAYER CONTROLS
@@ -24,13 +26,32 @@ local function obterControles()
         return controles
     end
 
-    local playerScripts = player:WaitForChild("PlayerScripts")
-    local playerModule = playerScripts:WaitForChild("PlayerModule")
-    local module = require(playerModule)
+    local success, result = pcall(function()
 
-    controles = module:GetControls()
+        local playerScripts = player:WaitForChild("PlayerScripts", 10)
 
-    return controles
+        if not playerScripts then
+            return nil
+        end
+
+        local playerModule = playerScripts:WaitForChild("PlayerModule", 10)
+
+        if not playerModule then
+            return nil
+        end
+
+        local module = require(playerModule)
+
+        return module:GetControls()
+
+    end)
+
+    if success and result then
+        controles = result
+        return result
+    end
+
+    return nil
 
 end
 
@@ -44,13 +65,17 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = player:WaitForChild("PlayerGui")
 
+--==================================================
+-- MAIN FRAME
+--==================================================
+
 local frame = Instance.new("Frame")
+frame.Name = "Main"
 frame.Size = UDim2.fromOffset(190, 132)
 frame.Position = UDim2.new(0.5, -95, 0.5, -66)
 frame.BackgroundColor3 = Color3.fromRGB(14, 14, 17)
 frame.BorderSizePixel = 0
 frame.Active = true
-frame.Draggable = true
 frame.Parent = gui
 
 local frameCorner = Instance.new("UICorner")
@@ -83,7 +108,7 @@ title.Parent = frame
 --==================================================
 
 local status = Instance.new("TextLabel")
-status.Size = UDim2.fromOffset(110, 18)
+status.Size = UDim2.fromOffset(150, 18)
 status.Position = UDim2.fromOffset(10, 29)
 status.BackgroundTransparency = 1
 status.Text = "● INACTIVE"
@@ -94,10 +119,11 @@ status.TextXAlignment = Enum.TextXAlignment.Left
 status.Parent = frame
 
 --==================================================
--- AUTO STEAL MANUAL BUTTON
+-- MANUAL BUTTON
 --==================================================
 
 local button = Instance.new("TextButton")
+button.Name = "ManualButton"
 button.Size = UDim2.new(1, -20, 0, 34)
 button.Position = UDim2.fromOffset(10, 51)
 button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
@@ -107,6 +133,8 @@ button.TextColor3 = Color3.fromRGB(235, 235, 235)
 button.TextSize = 12
 button.Font = Enum.Font.GothamBold
 button.AutoButtonColor = false
+button.Active = true
+button.Selectable = true
 button.Parent = frame
 
 local buttonCorner = Instance.new("UICorner")
@@ -124,6 +152,7 @@ buttonStroke.Parent = button
 --==================================================
 
 local autoButton = Instance.new("TextButton")
+autoButton.Name = "AutoButton"
 autoButton.Size = UDim2.new(1, -20, 0, 34)
 autoButton.Position = UDim2.fromOffset(10, 91)
 autoButton.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
@@ -133,6 +162,8 @@ autoButton.TextColor3 = Color3.fromRGB(235, 235, 235)
 autoButton.TextSize = 11
 autoButton.Font = Enum.Font.GothamBold
 autoButton.AutoButtonColor = false
+autoButton.Active = true
+autoButton.Selectable = true
 autoButton.Parent = frame
 
 local autoCorner = Instance.new("UICorner")
@@ -146,6 +177,68 @@ autoStroke.Transparency = 0.2
 autoStroke.Parent = autoButton
 
 --==================================================
+-- DRAG - PC + MOBILE
+--==================================================
+
+local dragging = false
+local dragInput = nil
+local dragStart = nil
+local startPosition = nil
+
+local function atualizarDrag(input)
+
+    local delta = input.Position - dragStart
+
+    frame.Position = UDim2.new(
+        startPosition.X.Scale,
+        startPosition.X.Offset + delta.X,
+        startPosition.Y.Scale,
+        startPosition.Y.Offset + delta.Y
+    )
+
+end
+
+frame.InputBegan:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragging = true
+        dragStart = input.Position
+        startPosition = frame.Position
+
+        input.Changed:Connect(function()
+
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+
+        end)
+
+    end
+
+end)
+
+frame.InputChanged:Connect(function(input)
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        dragInput = input
+
+    end
+
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+
+    if input == dragInput and dragging then
+        atualizarDrag(input)
+    end
+
+end)
+
+--==================================================
 -- GET CHARACTER
 --==================================================
 
@@ -154,7 +247,7 @@ local function pegar()
     local character = player.Character
 
     if not character then
-        return
+        return nil
     end
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -164,6 +257,8 @@ local function pegar()
         return character, humanoid, root
     end
 
+    return nil
+
 end
 
 --==================================================
@@ -171,6 +266,10 @@ end
 --==================================================
 
 local function pararCaminhada(humanoid)
+
+    if not humanoid then
+        return
+    end
 
     local animator = humanoid:FindFirstChildOfClass("Animator")
 
@@ -227,10 +326,22 @@ end
 
 local function bloquearControles()
 
+    if controlsDisabled then
+        return
+    end
+
     local controls = obterControles()
 
     if controls then
-        controls:Disable()
+
+        local success = pcall(function()
+            controls:Disable()
+        end)
+
+        if success then
+            controlsDisabled = true
+        end
+
     end
 
 end
@@ -241,24 +352,55 @@ end
 
 local function liberarControles()
 
+    if not controlsDisabled then
+        return
+    end
+
     local controls = obterControles()
 
     if controls then
-        controls:Enable()
+
+        pcall(function()
+            controls:Enable()
+        end)
+
+    end
+
+    controlsDisabled = false
+
+end
+
+--==================================================
+-- RESET BUTTON UI
+--==================================================
+
+local function atualizarUI(inativo)
+
+    if inativo then
+
+        button.Text = "ENABLE"
+        button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+
+        status.Text = "● INACTIVE"
+        status.TextColor3 = Color3.fromRGB(145, 145, 150)
+
+    else
+
+        button.Text = "DISABLE"
+        button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
+
+        status.Text = "● ACTIVE"
+        status.TextColor3 = Color3.fromRGB(90, 220, 115)
+
     end
 
 end
 
 --==================================================
--- DISABLE AUTO STEAL MANUAL
+-- DISABLE AUTO STEAL
 --==================================================
 
 local function desativar()
-
-    if not ativo then
-        liberarControles()
-        return
-    end
 
     ativo = false
 
@@ -280,21 +422,15 @@ local function desativar()
 
     removerOrientacao()
 
-    button.Text = "ENABLE"
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-
-    status.Text = "● INACTIVE"
-    status.TextColor3 = Color3.fromRGB(145, 145, 150)
+    atualizarUI(true)
 
 end
 
 --==================================================
--- ENABLE AUTO STEAL MANUAL
+-- ENABLE AUTO STEAL
 --==================================================
 
 local function iniciar()
-
-    removerOrientacao()
 
     local character, humanoid, root = pegar()
 
@@ -302,18 +438,18 @@ local function iniciar()
 
         ativo = false
         liberarControles()
-
-        button.Text = "ENABLE"
-        button.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-
-        status.Text = "● INACTIVE"
-        status.TextColor3 = Color3.fromRGB(145, 145, 150)
+        atualizarUI(true)
 
         return
 
     end
 
-    -- Disable manual movement
+    removerOrientacao()
+
+    --==================================================
+    -- DISABLE PLAYER CONTROL
+    --==================================================
+
     bloquearControles()
 
     humanoid.AutoRotate = false
@@ -356,7 +492,7 @@ local function iniciar()
     end
 
     --==================================================
-    -- TOKEN
+    -- MOVEMENT TOKEN
     --==================================================
 
     movimentoToken += 1
@@ -369,18 +505,22 @@ local function iniciar()
 
     task.spawn(function()
 
-        while ativo
-            and meuToken == movimentoToken
-            and humanoid.Parent
-            and root.Parent do
+        while true do
 
-            -- Prevent jumping
+            if not ativo then
+                break
+            end
+
+            if meuToken ~= movimentoToken then
+                break
+            end
+
+            if not humanoid.Parent or not root.Parent then
+                break
+            end
+
             humanoid.Jump = false
 
-            -- Keep manual controls disabled
-            bloquearControles()
-
-            -- Keep Walk/Run animations stopped
             pararCaminhada(humanoid)
 
             local distancia = (root.Position - POS2).Magnitude
@@ -400,7 +540,15 @@ local function iniciar()
             end
 
             --==================================================
-            -- AUTO MOVEMENT
+            -- KEEP CONTROLS DISABLED
+            --==================================================
+
+            if not controlsDisabled then
+                bloquearControles()
+            end
+
+            --==================================================
+            -- MOVE
             --==================================================
 
             humanoid:MoveTo(POS2)
@@ -410,7 +558,10 @@ local function iniciar()
         end
 
         if not ativo and humanoid.Parent then
+
             humanoid:Move(Vector3.zero, true)
+            humanoid.Jump = false
+
         end
 
     end)
@@ -418,28 +569,24 @@ local function iniciar()
 end
 
 --==================================================
--- AUTO STEAL MANUAL BUTTON
+-- MANUAL BUTTON
 --==================================================
 
-button.MouseButton1Click:Connect(function()
+button.Activated:Connect(function()
 
     if ativo then
 
         desativar()
 
-    else
-
-        ativo = true
-
-        button.Text = "DISABLE"
-        button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
-
-        status.Text = "● ACTIVE"
-        status.TextColor3 = Color3.fromRGB(90, 220, 115)
-
-        iniciar()
+        return
 
     end
+
+    ativo = true
+
+    atualizarUI(false)
+
+    iniciar()
 
 end)
 
@@ -447,7 +594,7 @@ end)
 -- AUTO STEAL BUTTON
 --==================================================
 
-autoButton.MouseButton1Click:Connect(function()
+autoButton.Activated:Connect(function()
 
     autoLeft = not autoLeft
 
@@ -471,29 +618,21 @@ end)
 
 ProximityPromptService.PromptTriggered:Connect(function(prompt, triggeredPlayer)
 
-    -- Only react to the local player
     if triggeredPlayer ~= player then
         return
     end
 
-    -- Auto Steal must be enabled
     if not autoLeft then
         return
     end
 
-    -- Don't restart if already active
     if ativo then
         return
     end
 
-    -- Start automatically
     ativo = true
 
-    button.Text = "DISABLE"
-    button.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
-
-    status.Text = "● ACTIVE"
-    status.TextColor3 = Color3.fromRGB(90, 220, 115)
+    atualizarUI(false)
 
     iniciar()
 
@@ -505,28 +644,37 @@ end)
 
 player.CharacterAdded:Connect(function(character)
 
+    movimentoToken += 1
+
     liberarControles()
+    removerOrientacao()
 
-    if align then
-        align:Destroy()
-        align = nil
+    ativo = false
+
+    atualizarUI(true)
+
+    task.wait(1)
+
+    if not character.Parent then
+        return
     end
 
-    if attachment then
-        attachment:Destroy()
-        attachment = nil
+    if autoLeft then
+        -- Auto Steal remains enabled,
+        -- but movement only starts after another prompt.
     end
+
+end)
+
+--==================================================
+-- CHARACTER REMOVING
+--==================================================
+
+player.CharacterRemoving:Connect(function()
 
     movimentoToken += 1
 
-    if ativo then
-
-        task.wait(1)
-
-        if ativo then
-            iniciar()
-        end
-
-    end
+    liberarControles()
+    removerOrientacao()
 
 end)
