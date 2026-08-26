@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local player = Players.LocalPlayer
 
@@ -17,18 +18,13 @@ local controles = nil
 local controlsDisabled = false
 
 --==================================================
--- AUTO STEL
+-- AUTO STEAL
 --==================================================
 
 local autoStealConnection = nil
 local promptTriggeredConnection = nil
 
--- Guarda o HoldDuration original somente dos prompts
--- que realmente foram encontrados pelo Auto Steal.
 local promptDelays = {}
-
--- Evita disparar o mesmo prompt várias vezes
--- em um intervalo muito curto.
 local promptCooldown = {}
 
 local PROMPT_COOLDOWN = 0.15
@@ -44,9 +40,7 @@ local function configurarPrompt(prompt)
     end
 
     if promptDelays[prompt] == nil then
-
         promptDelays[prompt] = prompt.HoldDuration
-
     end
 
     if prompt.HoldDuration ~= 0 then
@@ -383,7 +377,7 @@ local function removerOrientacao()
 end
 
 --==================================================
--- DISABLE CONTROLS
+-- BLOCK CONTROLS
 --==================================================
 
 local function bloquearControles()
@@ -429,6 +423,38 @@ local function liberarControles()
     end
 
     controlsDisabled = false
+
+end
+
+--==================================================
+-- BLOCK WASD
+--==================================================
+
+local function bloquearWASD()
+
+    local function bloquearMovimento()
+        return Enum.ContextActionResult.Sink
+    end
+
+    ContextActionService:BindAction(
+        "AutoStealBlockMovement",
+        bloquearMovimento,
+        false,
+        Enum.KeyCode.W,
+        Enum.KeyCode.A,
+        Enum.KeyCode.S,
+        Enum.KeyCode.D
+    )
+
+end
+
+--==================================================
+-- UNBLOCK WASD
+--==================================================
+
+local function liberarWASD()
+
+    ContextActionService:UnbindAction("AutoStealBlockMovement")
 
 end
 
@@ -480,6 +506,9 @@ end
 local function desativar()
 
     ativo = false
+
+    -- Libera WASD imediatamente
+    liberarWASD()
 
     movimentoToken += 1
 
@@ -540,7 +569,10 @@ local function iniciar()
     if not character or not humanoid or not root then
 
         ativo = false
+
+        liberarWASD()
         liberarControles()
+
         atualizarUI(true)
 
         return
@@ -663,12 +695,14 @@ end
 
 local function ativarEnable()
 
-    -- Se já está ativo, não reinicia a movimentação.
     if ativo then
         return
     end
 
     ativo = true
+
+    -- Bloqueia WASD enquanto o Enable estiver ativo
+    bloquearWASD()
 
     atualizarUI(false)
 
@@ -692,9 +726,7 @@ promptTriggeredConnection =
         end
 
         -- Qualquer prompt completado pelo jogador
-        -- ou pelo Auto Steal chega aqui.
-        --
-        -- O Enable só é iniciado se ainda não estiver ativo.
+        -- ou pelo Auto Steal ativa o Enable.
         ativarEnable()
 
     end)
@@ -718,6 +750,26 @@ button.Activated:Connect(function()
 end)
 
 --==================================================
+-- R = DESATIVAR ENABLE
+--==================================================
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+
+    if gameProcessed then
+        return
+    end
+
+    if input.KeyCode == Enum.KeyCode.R then
+
+        if ativo then
+            desativar()
+        end
+
+    end
+
+end)
+
+--==================================================
 -- AUTO STEAL BUTTON
 --==================================================
 
@@ -730,9 +782,8 @@ autoButton.Activated:Connect(function()
         autoButton.Text = "AUTO STEAL: ON"
         autoButton.BackgroundColor3 = Color3.fromRGB(38, 90, 52)
 
-        -- Não fazemos mais GetDescendants().
-        -- O prompt só é processado quando realmente
-        -- aparece para o jogador.
+        -- Detecta somente prompts que realmente aparecem
+        -- para o jogador.
         autoStealConnection =
             ProximityPromptService.PromptShown:Connect(function(prompt)
 
@@ -750,7 +801,6 @@ autoButton.Activated:Connect(function()
 
                 configurarPrompt(prompt)
 
-                -- Pequeno controle contra múltiplos disparos.
                 local agora = os.clock()
                 local ultimo = promptCooldown[prompt]
 
@@ -805,6 +855,7 @@ player.CharacterAdded:Connect(function(character)
 
     movimentoToken += 1
 
+    liberarWASD()
     liberarControles()
     removerOrientacao()
 
@@ -818,11 +869,6 @@ player.CharacterAdded:Connect(function(character)
         return
     end
 
-    -- O Auto Steal não precisa fazer uma nova
-    -- varredura no mapa.
-    -- Os prompts serão detectados normalmente
-    -- quando aparecerem.
-
 end)
 
 --==================================================
@@ -833,6 +879,7 @@ player.CharacterRemoving:Connect(function()
 
     movimentoToken += 1
 
+    liberarWASD()
     liberarControles()
     removerOrientacao()
 
