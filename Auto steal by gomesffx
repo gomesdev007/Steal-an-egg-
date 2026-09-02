@@ -1,1 +1,1193 @@
-encerrado
+--// MONSTER PARASITE EGG ESP + AUTO FARM
+--// BY GOMES
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local AreaEggSlotsClient = workspace:WaitForChild("AreaEggSlotsClient")
+
+--==================================================
+-- CONFIG
+--==================================================
+
+local POS1 = Vector3.new(496.76, 70.57, -351.23)
+local POS2 = Vector3.new(537.09, 70.57, -410.15)
+
+local FARM_SPEED = 16
+
+local EGG_DISTANCE = 5
+local POS1_DISTANCE = 4
+local POS2_DISTANCE = 5
+
+local PROMPT_RADIUS = 8
+
+--==================================================
+-- ESP
+--==================================================
+
+local ESP_FOLDER_NAME = "MonsterParasiteESP"
+
+local oldESP = AreaEggSlotsClient:FindFirstChild(ESP_FOLDER_NAME)
+
+if oldESP then
+    oldESP:Destroy()
+end
+
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = ESP_FOLDER_NAME
+ESPFolder.Parent = AreaEggSlotsClient
+
+local ESPs = {}
+
+local function getTargetPart(egg)
+
+    local visual = egg:FindFirstChild("MonsterParasiteVisual")
+
+    if visual then
+
+        local root = visual:FindFirstChild("RootPart", true)
+
+        if root and root:IsA("BasePart") then
+            return root
+        end
+
+    end
+
+    return egg:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function removeESP(egg)
+
+    local gui = ESPs[egg]
+
+    if gui then
+
+        gui:Destroy()
+        ESPs[egg] = nil
+
+    end
+
+end
+
+local function createESP(egg)
+
+    if ESPs[egg] then
+        return
+    end
+
+    local visual =
+        egg:FindFirstChild("MonsterParasiteVisual")
+
+    if not visual then
+        return
+    end
+
+    local target =
+        getTargetPart(egg)
+
+    if not target then
+        return
+    end
+
+    local billboard =
+        Instance.new("BillboardGui")
+
+    billboard.Name = "MonsterParasiteESP"
+    billboard.Adornee = target
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.fromOffset(190, 55)
+    billboard.StudsOffset =
+        Vector3.new(0, 3.5, 0)
+    billboard.MaxDistance = 10000
+    billboard.Parent = ESPFolder
+
+    local label =
+        Instance.new("TextLabel")
+
+    label.Name = "Label"
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.Text = "✨ MONSTER PARASITE"
+    label.TextSize = 18
+    label.TextColor3 =
+        Color3.fromRGB(190, 80, 255)
+    label.TextStrokeColor3 =
+        Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.Parent = billboard
+
+    ESPs[egg] = billboard
+
+    task.spawn(function()
+
+        while ESPs[egg] == billboard
+            and egg.Parent do
+
+            local currentVisual =
+                egg:FindFirstChild(
+                    "MonsterParasiteVisual"
+                )
+
+            if not currentVisual then
+                break
+            end
+
+            local currentTarget =
+                getTargetPart(egg)
+
+            if currentTarget then
+                billboard.Adornee =
+                    currentTarget
+            end
+
+            task.wait(0.25)
+
+        end
+
+        if ESPs[egg] == billboard then
+            removeESP(egg)
+        end
+
+    end)
+
+end
+
+local function checkEgg(egg)
+
+    if not egg:IsA("Model")
+        and not egg:IsA("Folder") then
+        return
+    end
+
+    if egg:FindFirstChild(
+        "MonsterParasiteVisual"
+    ) then
+
+        createESP(egg)
+
+    else
+
+        removeESP(egg)
+
+    end
+
+end
+
+for _, egg in ipairs(
+    AreaEggSlotsClient:GetChildren()
+) do
+
+    checkEgg(egg)
+
+end
+
+AreaEggSlotsClient.ChildAdded:Connect(
+    function(egg)
+
+        task.wait(0.05)
+
+        checkEgg(egg)
+
+        local connection
+
+        connection =
+            egg.DescendantAdded:Connect(
+                function(obj)
+
+                    if obj.Name ==
+                        "MonsterParasiteVisual" then
+
+                        task.wait()
+
+                        createESP(egg)
+
+                        if connection then
+                            connection:Disconnect()
+                        end
+
+                    end
+
+                end
+            )
+
+        task.delay(5, function()
+
+            if connection then
+                connection:Disconnect()
+            end
+
+        end)
+
+    end
+)
+
+AreaEggSlotsClient.ChildRemoved:Connect(
+    function(egg)
+
+        removeESP(egg)
+
+    end
+)
+
+--==================================================
+-- CHARACTER
+--==================================================
+
+local Character
+local Humanoid
+local RootPart
+
+local function updateCharacter()
+
+    Character =
+        Player.Character
+        or Player.CharacterAdded:Wait()
+
+    Humanoid =
+        Character:WaitForChild("Humanoid")
+
+    RootPart =
+        Character:WaitForChild(
+            "HumanoidRootPart"
+        )
+
+end
+
+updateCharacter()
+
+Player.CharacterAdded:Connect(
+    function()
+
+        task.wait(1)
+
+        updateCharacter()
+
+    end
+)
+
+--==================================================
+-- PROMPTS
+--==================================================
+
+local function getPromptPart(prompt)
+
+    if not prompt
+        or not prompt.Parent then
+        return nil
+    end
+
+    if prompt.Parent:IsA("BasePart") then
+        return prompt.Parent
+    end
+
+    return prompt.Parent:
+        FindFirstChildWhichIsA(
+            "BasePart",
+            true
+        )
+
+end
+
+local function activatePrompt(prompt)
+
+    if not prompt then
+        return false
+    end
+
+    if not prompt.Parent then
+        return false
+    end
+
+    if not prompt:IsA(
+        "ProximityPrompt"
+    ) then
+        return false
+    end
+
+    if not prompt.Enabled then
+        return false
+    end
+
+    if typeof(
+        fireproximityprompt
+    ) == "function" then
+
+        local success =
+            pcall(function()
+
+                fireproximityprompt(
+                    prompt
+                )
+
+            end)
+
+        return success
+    end
+
+    return false
+
+end
+
+--==================================================
+-- PROMPT DO OVO
+--==================================================
+
+local function getEggPrompt(egg)
+
+    if not egg
+        or not egg.Parent then
+        return nil
+    end
+
+    local eggPart =
+        getTargetPart(egg)
+
+    if not eggPart then
+        return nil
+    end
+
+    local closest
+    local closestDistance =
+        math.huge
+
+    for _, obj in ipairs(
+        egg:GetDescendants()
+    ) do
+
+        if obj:IsA(
+            "ProximityPrompt"
+        )
+        and obj.Enabled then
+
+            local part =
+                getPromptPart(obj)
+
+            if part then
+
+                local distance =
+                    (
+                        part.Position
+                        - eggPart.Position
+                    ).Magnitude
+
+                if distance <
+                    closestDistance then
+
+                    closestDistance =
+                        distance
+
+                    closest = obj
+
+                end
+
+            end
+
+        end
+
+    end
+
+    return closest
+
+end
+
+--==================================================
+-- PROMPT PERTO DA POSIÇÃO
+--==================================================
+
+local function getPromptNearPosition(
+    position,
+    radius
+)
+
+    local closest
+    local closestDistance = radius
+
+    for _, obj in ipairs(
+        workspace:GetDescendants()
+    ) do
+
+        if obj:IsA(
+            "ProximityPrompt"
+        )
+        and obj.Enabled then
+
+            local part =
+                getPromptPart(obj)
+
+            if part then
+
+                local distance =
+                    (
+                        part.Position
+                        - position
+                    ).Magnitude
+
+                if distance <=
+                    closestDistance then
+
+                    closestDistance =
+                        distance
+
+                    closest = obj
+
+                end
+
+            end
+
+        end
+
+    end
+
+    return closest
+
+end
+
+--==================================================
+-- OVO USADO
+--==================================================
+
+local UsedEggs = {}
+
+--==================================================
+-- OVO MAIS PRÓXIMO
+--==================================================
+
+local function getNearestEgg()
+
+    if not RootPart then
+        return nil
+    end
+
+    local nearest
+    local nearestDistance =
+        math.huge
+
+    for egg, billboard in pairs(ESPs) do
+
+        if egg
+            and egg.Parent
+            and billboard
+            and billboard.Parent
+            and not UsedEggs[egg] then
+
+            local target =
+                getTargetPart(egg)
+
+            if target then
+
+                local distance =
+                    (
+                        target.Position
+                        - RootPart.Position
+                    ).Magnitude
+
+                if distance <
+                    nearestDistance then
+
+                    nearestDistance =
+                        distance
+
+                    nearest = egg
+
+                end
+
+            end
+
+        end
+
+    end
+
+    return nearest
+
+end
+
+--==================================================
+-- DETECTAR INTERRUPÇÃO
+--==================================================
+
+local function wasInterrupted()
+
+    if not farmEnabled then
+        return true
+    end
+
+    if not Character
+        or not Character.Parent then
+        return true
+    end
+
+    if not Humanoid
+        or Humanoid.Health <= 0 then
+        return true
+    end
+
+    local state =
+        Humanoid:GetState()
+
+    if state ==
+        Enum.HumanoidStateType.Ragdoll
+        or state ==
+        Enum.HumanoidStateType.FallingDown
+        or state ==
+        Enum.HumanoidStateType.Physics
+        or state ==
+        Enum.HumanoidStateType.PlatformStanding
+        or state ==
+        Enum.HumanoidStateType.Seated
+        or state ==
+        Enum.HumanoidStateType.Dead then
+
+        return true
+
+    end
+
+    return false
+
+end
+
+--==================================================
+-- ANDAR
+--==================================================
+
+local function walkTo(
+    position,
+    distance
+)
+
+    if not Humanoid
+        or not RootPart then
+        return false
+    end
+
+    Humanoid.WalkSpeed =
+        FARM_SPEED
+
+    local lastMove = 0
+
+    while farmEnabled do
+
+        if wasInterrupted() then
+            return false
+        end
+
+        local currentDistance =
+            (
+                RootPart.Position
+                - position
+            ).Magnitude
+
+        if currentDistance <=
+            distance then
+
+            Humanoid:MoveTo(
+                RootPart.Position
+            )
+
+            return true
+
+        end
+
+        if tick() - lastMove >=
+            0.3 then
+
+            Humanoid:MoveTo(
+                position
+            )
+
+            lastMove = tick()
+
+        end
+
+        task.wait(0.05)
+
+    end
+
+    return false
+
+end
+
+--==================================================
+-- IR ATÉ OVO
+--==================================================
+
+local function walkToEgg(egg)
+
+    if not egg
+        or not egg.Parent then
+        return false
+    end
+
+    Humanoid.WalkSpeed =
+        FARM_SPEED
+
+    local lastMove = 0
+
+    while farmEnabled do
+
+        if wasInterrupted() then
+            return false
+        end
+
+        if not egg.Parent then
+            return false
+        end
+
+        local target =
+            getTargetPart(egg)
+
+        if not target then
+            return false
+        end
+
+        local targetPosition =
+            target.Position
+            + Vector3.new(0, 1.5, 0)
+
+        local distance =
+            (
+                RootPart.Position
+                - targetPosition
+            ).Magnitude
+
+        --==========================================
+        -- CONFIRMOU PRESENÇA NO OVO
+        --==========================================
+
+        if distance <=
+            EGG_DISTANCE then
+
+            Humanoid:MoveTo(
+                RootPart.Position
+            )
+
+            task.wait(0.15)
+
+            -- SOMENTE AGORA procura prompt
+            local prompt =
+                getEggPrompt(egg)
+
+            if prompt then
+
+                local activated =
+                    activatePrompt(prompt)
+
+                if activated then
+
+                    -- Marca imediatamente
+                    UsedEggs[egg] = true
+
+                    -- Sai imediatamente do ovo
+                    -- e vai para POS1
+                    return true
+
+                end
+
+            end
+
+        else
+
+            -- Enquanto está andando:
+            -- NÃO ativa prompts.
+
+            if tick() - lastMove >=
+                0.3 then
+
+                Humanoid:MoveTo(
+                    targetPosition
+                )
+
+                lastMove = tick()
+
+            end
+
+        end
+
+        task.wait(0.05)
+
+    end
+
+    return false
+
+end
+
+--==================================================
+-- AUTO PROMPT NA POSIÇÃO
+--==================================================
+
+local function activateAtPosition(
+    position
+)
+
+    if not RootPart then
+        return false
+    end
+
+    -- Confirma presença primeiro
+    local distance =
+        (
+            RootPart.Position
+            - position
+        ).Magnitude
+
+    if distance >
+        PROMPT_RADIUS then
+
+        return false
+
+    end
+
+    -- Agora procura o prompt
+    local prompt =
+        getPromptNearPosition(
+            position,
+            PROMPT_RADIUS
+        )
+
+    if prompt then
+
+        return activatePrompt(
+            prompt
+        )
+
+    end
+
+    return false
+
+end
+
+--==================================================
+-- CICLO
+--==================================================
+
+local function runCycle()
+
+    --==============================================
+    -- 1. NOVO OVO
+    --==============================================
+
+    local egg =
+        getNearestEgg()
+
+    if not egg then
+        return false
+    end
+
+    --==============================================
+    -- 2. OVO
+    --==============================================
+
+    local eggFinished =
+        walkToEgg(egg)
+
+    if not eggFinished then
+        return false
+    end
+
+    if not farmEnabled then
+        return false
+    end
+
+    --==============================================
+    -- 3. DIRETO PARA POS1
+    --==============================================
+
+    local pos1Reached =
+        walkTo(
+            POS1,
+            POS1_DISTANCE
+        )
+
+    if not pos1Reached then
+        return false
+    end
+
+    if not farmEnabled then
+        return false
+    end
+
+    --==============================================
+    -- 4. CONFIRMOU POS1
+    -- AUTO PROMPT LIGA AQUI
+    --==============================================
+
+    Humanoid:MoveTo(
+        RootPart.Position
+    )
+
+    task.wait(0.1)
+
+    activateAtPosition(POS1)
+
+    --==============================================
+    -- 5. TRAVA 1 SEGUNDO
+    --==============================================
+
+    Humanoid:MoveTo(
+        RootPart.Position
+    )
+
+    task.wait(1)
+
+    if not farmEnabled then
+        return false
+    end
+
+    --==============================================
+    -- 6. POS2
+    --==============================================
+
+    local pos2Reached =
+        walkTo(
+            POS2,
+            POS2_DISTANCE
+        )
+
+    if not pos2Reached then
+        return false
+    end
+
+    if not farmEnabled then
+        return false
+    end
+
+    --==============================================
+    -- 7. CONFIRMOU POS2
+    -- PROMPT
+    --==============================================
+
+    Humanoid:MoveTo(
+        RootPart.Position
+    )
+
+    task.wait(0.1)
+
+    activateAtPosition(POS2)
+
+    task.wait(0.4)
+
+    --==============================================
+    -- 8. CICLO COMPLETO
+    --==============================================
+
+    return true
+
+end
+
+--==================================================
+-- FARM LOOP
+--==================================================
+
+local function startFarm()
+
+    if farmRunning then
+        return
+    end
+
+    farmRunning = true
+
+    task.spawn(function()
+
+        while farmEnabled do
+
+            if not Character
+                or not Character.Parent
+                or not Humanoid
+                or not RootPart then
+
+                updateCharacter()
+
+                task.wait(0.5)
+
+            else
+
+                local success =
+                    runCycle()
+
+                if not farmEnabled then
+                    break
+                end
+
+                -- Se foi interrompido:
+                -- PARA e começa novamente do zero.
+                if not success then
+
+                    Humanoid:MoveTo(
+                        RootPart.Position
+                    )
+
+                    task.wait(0.3)
+
+                else
+
+                    -- Só depois de POS2
+                    -- procura outro ovo.
+                    task.wait(0.2)
+
+                end
+
+            end
+
+        end
+
+        farmRunning = false
+
+    end)
+
+end
+
+--==================================================
+-- GUI
+--==================================================
+
+local oldGui =
+    Player.PlayerGui:
+    FindFirstChild(
+        "MonsterParasiteFarmGUI"
+    )
+
+if oldGui then
+    oldGui:Destroy()
+end
+
+local ScreenGui =
+    Instance.new("ScreenGui")
+
+ScreenGui.Name =
+    "MonsterParasiteFarmGUI"
+
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior =
+    Enum.ZIndexBehavior.Sibling
+
+ScreenGui.Parent =
+    Player.PlayerGui
+
+local Button =
+    Instance.new("TextButton")
+
+Button.Name =
+    "FarmButton"
+
+Button.AnchorPoint =
+    Vector2.new(0.5, 0.5)
+
+Button.Position =
+    UDim2.fromScale(
+        0.5,
+        0.5
+    )
+
+Button.Size =
+    UDim2.fromOffset(
+        170,
+        55
+    )
+
+Button.BackgroundColor3 =
+    Color3.fromRGB(
+        25,
+        25,
+        25
+    )
+
+Button.BorderSizePixel = 0
+
+Button.Text =
+    "FARM: OFF"
+
+Button.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+Button.TextSize = 18
+
+Button.Font =
+    Enum.Font.GothamBold
+
+Button.Parent =
+    ScreenGui
+
+local Corner =
+    Instance.new("UICorner")
+
+Corner.CornerRadius =
+    UDim.new(0, 12)
+
+Corner.Parent =
+    Button
+
+local Stroke =
+    Instance.new("UIStroke")
+
+Stroke.Thickness = 1.5
+
+Stroke.Color =
+    Color3.fromRGB(
+        120,
+        120,
+        120
+    )
+
+Stroke.Parent =
+    Button
+
+--==================================================
+-- ARRASTAR
+--==================================================
+
+local dragging = false
+local dragStart
+local startPosition
+local dragInput
+
+Button.InputBegan:Connect(
+    function(input)
+
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or input.UserInputType ==
+            Enum.UserInputType.Touch then
+
+            dragging = true
+
+            dragStart =
+                input.Position
+
+            startPosition =
+                Button.Position
+
+        end
+
+    end
+)
+
+Button.InputChanged:Connect(
+    function(input)
+
+        if input.UserInputType ==
+            Enum.UserInputType.MouseMovement
+            or input.UserInputType ==
+            Enum.UserInputType.Touch then
+
+            dragInput = input
+
+        end
+
+    end
+)
+
+UserInputService.InputChanged:Connect(
+    function(input)
+
+        if dragging
+            and input == dragInput then
+
+            local delta =
+                input.Position
+                - dragStart
+
+            Button.Position =
+                UDim2.new(
+                    startPosition.X.Scale,
+                    startPosition.X.Offset
+                        + delta.X,
+
+                    startPosition.Y.Scale,
+                    startPosition.Y.Offset
+                        + delta.Y
+                )
+
+        end
+
+    end
+)
+
+UserInputService.InputEnded:Connect(
+    function(input)
+
+        if input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or input.UserInputType ==
+            Enum.UserInputType.Touch then
+
+            dragging = false
+
+        end
+
+    end
+)
+
+--==================================================
+-- BOTÃO FARM
+--==================================================
+
+Button.Activated:Connect(
+    function()
+
+        farmEnabled =
+            not farmEnabled
+
+        if farmEnabled then
+
+            Button.Text =
+                "FARM: ON"
+
+            Stroke.Color =
+                Color3.fromRGB(
+                    80,
+                    255,
+                    120
+                )
+
+            startFarm()
+
+        else
+
+            Button.Text =
+                "FARM: OFF"
+
+            Stroke.Color =
+                Color3.fromRGB(
+                    120,
+                    120,
+                    120
+                )
+
+            if Humanoid
+                and RootPart then
+
+                Humanoid:MoveTo(
+                    RootPart.Position
+                )
+
+            end
+
+        end
+
+    end
+)
+
+print(
+    "======================================"
+)
+
+print(
+    "✅ MONSTER PARASITE ESP + AUTO FARM"
+)
+
+print(
+    "🥚 OVO -> POS1 -> 1s -> POS2"
+)
+
+print(
+    "✅ PROMPT SOMENTE APÓS CONFIRMAR PRESENÇA"
+)
+
+print(
+    "======================================"
+)
