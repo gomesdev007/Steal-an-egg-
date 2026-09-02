@@ -1,0 +1,416 @@
+--// MONSTER PARASITE EGG ESP + FARM AUTO
+--// Detecta: Workspace.AreaEggSlotsClient.<ID>.MonsterParasiteVisual
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local AreaEggSlotsClient = workspace:WaitForChild("AreaEggSlotsClient")
+
+local ESP_FOLDER_NAME = "MonsterParasiteESP"
+local farmActive = false
+local currentTarget = nil
+
+--// Pasta para organizar os ESPs
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = ESP_FOLDER_NAME
+ESPFolder.Parent = AreaEggSlotsClient
+
+local ESPs = {}
+
+-- ============ POSIÇÕES DE FARM ============
+local FARM_POSITIONS = {
+	Vector3.new(496.76, 70.57, -351.23),
+	Vector3.new(537.09, 70.57, -410.15)
+}
+
+-- ============ FUNÇÕES ESP (ORIGINAL) ============
+
+local function getTargetPart(egg)
+	local visual = egg:FindFirstChild("MonsterParasiteVisual")
+	
+	if visual then
+		local root = visual:FindFirstChild("RootPart", true)
+		
+		if root and root:IsA("BasePart") then
+			return root
+		end
+	end
+	
+	local part = egg:FindFirstChildWhichIsA("BasePart", true)
+	return part
+end
+
+local function removeESP(egg)
+	local gui = ESPs[egg]
+	
+	if gui then
+		gui:Destroy()
+		ESPs[egg] = nil
+	end
+end
+
+local function createESP(egg)
+	if ESPs[egg] then
+		return
+	end
+	
+	local visual = egg:FindFirstChild("MonsterParasiteVisual")
+	
+	if not visual then
+		return
+	end
+	
+	local target = getTargetPart(egg)
+	
+	if not target then
+		return
+	end
+	
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "MonsterParasiteESP"
+	billboard.Adornee = target
+	billboard.AlwaysOnTop = true
+	billboard.Size = UDim2.fromOffset(190, 55)
+	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+	billboard.MaxDistance = 10000
+	billboard.Parent = ESPFolder
+	
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.GothamBold
+	label.Text = "✨ MONSTER PARASITE"
+	label.TextSize = 18
+	label.TextColor3 = Color3.fromRGB(190, 80, 255)
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeTransparency = 0
+	label.Parent = billboard
+	
+	ESPs[egg] = billboard
+	
+	task.spawn(function()
+		while ESPs[egg] == billboard and egg.Parent do
+			local currentVisual = egg:FindFirstChild("MonsterParasiteVisual")
+			
+			if not currentVisual then
+				break
+			end
+			
+			local currentTarget = getTargetPart(egg)
+			
+			if currentTarget then
+				billboard.Adornee = currentTarget
+			end
+			
+			task.wait(0.25)
+		end
+		
+		if ESPs[egg] == billboard then
+			removeESP(egg)
+		end
+	end)
+end
+
+local function checkEgg(egg)
+	if not egg:IsA("Model") and not egg:IsA("Folder") then
+		return
+	end
+	
+	if egg:FindFirstChild("MonsterParasiteVisual") then
+		createESP(egg)
+	else
+		removeESP(egg)
+	end
+end
+
+--// Ovos que já existem
+for _, egg in ipairs(AreaEggSlotsClient:GetChildren()) do
+	checkEgg(egg)
+end
+
+--// Novos ovos
+AreaEggSlotsClient.ChildAdded:Connect(function(egg)
+	task.wait(0.05)
+	
+	checkEgg(egg)
+	
+	local connection
+	connection = egg.DescendantAdded:Connect(function(obj)
+		if obj.Name == "MonsterParasiteVisual" then
+			task.wait()
+			createESP(egg)
+			if connection then
+				connection:Disconnect()
+			end
+		end
+	end)
+	
+	task.delay(5, function()
+		if connection then
+			connection:Disconnect()
+		end
+	end)
+end)
+
+--// Remove ESP quando o ovo é removido
+AreaEggSlotsClient.ChildRemoved:Connect(function(egg)
+	removeESP(egg)
+end)
+
+-- ============ FUNÇÕES DE FARM ============
+
+local function getClosestEgg()
+	local closest = nil
+	local closestDistance = math.huge
+	local charPos = Character:FindFirstChild("HumanoidRootPart")
+	
+	if not charPos then
+		return nil
+	end
+	
+	for _, egg in ipairs(AreaEggSlotsClient:GetChildren()) do
+		local visual = egg:FindFirstChild("MonsterParasiteVisual")
+		if visual then
+			local target = getTargetPart(egg)
+			if target then
+				local distance = (target.Position - charPos.Position).Magnitude
+				if distance < closestDistance then
+					closestDistance = distance
+					closest = egg
+				end
+			end
+		end
+	end
+	
+	return closest
+end
+
+local function moveToPosition(targetPosition, stopDistance)
+	stopDistance = stopDistance or 0.5
+	local charRoot = Character:FindFirstChild("HumanoidRootPart")
+	local humanoid = Character:FindFirstChild("Humanoid")
+	
+	if not charRoot or not humanoid then
+		return false
+	end
+	
+	humanoid:MoveTo(targetPosition)
+	
+	-- Aguarda chegada sem alterar velocidade
+	local startTime = tick()
+	while (charRoot.Position - targetPosition).Magnitude > stopDistance and farmActive do
+		if tick() - startTime > 30 then
+			break
+		end
+		
+		humanoid:MoveTo(targetPosition)
+		task.wait(0.1)
+	end
+	
+	return true
+end
+
+local function completeProxymiPrompt(keyCode)
+	keyCode = keyCode or Enum.KeyCode.E
+	local charRoot = Character:FindFirstChild("HumanoidRootPart")
+	if not charRoot then
+		return false
+	end
+	
+	local prompts = {}
+	
+	--// Procura em todo o workspace
+	for _, obj in ipairs(workspace:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") then
+			local distance = (obj.Parent.Position - charRoot.Position).Magnitude
+			if distance < 50 then
+				--// Verifica qual é ativado com E ou R
+				if obj.KeyboardKeyCode == keyCode then
+					table.insert(prompts, {prompt = obj, distance = distance})
+				end
+			end
+		end
+	end
+	
+	if #prompts == 0 then
+		return false
+	end
+	
+	--// Ordena pela proximidade
+	table.sort(prompts, function(a, b)
+		return a.distance < b.distance
+	end)
+	
+	--// Ativa o primeiro prompt (mais próximo com a KeyCode correta)
+	local prompt = prompts[1].prompt
+	
+	prompt:InputHoldBegin()
+	task.wait(0.8)
+	prompt:InputHoldEnd()
+	
+	return true
+end
+
+local function farmLoop()
+	print("🌾 Loop de Farm Iniciado!")
+	
+	while farmActive do
+		local charRoot = Character:FindFirstChild("HumanoidRootPart")
+		if not charRoot then
+			print("❌ Personagem não encontrado!")
+			task.wait(1)
+			continue
+		end
+		
+		--// 1. Encontra o egg mais próximo
+		local egg = getClosestEgg()
+		
+		if not egg then
+			print("⏳ Procurando ovos...")
+			task.wait(2)
+			continue
+		end
+		
+		local target = getTargetPart(egg)
+		if not target then
+			task.wait(1)
+			continue
+		end
+		
+		--// 2. Move até o egg
+		print("🎯 Andando para o ovo...")
+		moveToPosition(target.Position, 0.8)
+		task.wait(0.3)
+		
+		--// 3. Completa ProxymiPrompt do egg (KeyCode E)
+		print("⚡ Completando prompt do ovo...")
+		completeProxymiPrompt(Enum.KeyCode.E)
+		task.wait(1)
+		
+		--// 4. Move para posição 1
+		local pos1 = FARM_POSITIONS[1]
+		print("📍 Andando para Posição 1...")
+		moveToPosition(pos1, 0.8)
+		task.wait(0.3)
+		
+		--// 5. Completa prompt da posição 1 (KeyCode E)
+		print("⚡ Completando prompt da Pos1...")
+		completeProxymiPrompt(Enum.KeyCode.E)
+		task.wait(1)
+		
+		--// 6. Trava por 1 segundo
+		print("⏸️ Pausando 1 segundo...")
+		task.wait(1)
+		
+		--// 7. Move para posição 2
+		local pos2 = FARM_POSITIONS[2]
+		print("📍 Andando para Posição 2...")
+		moveToPosition(pos2, 0.8)
+		task.wait(0.3)
+		
+		--// 8. Completa prompt da posição 2 (KeyCode E - o de cima)
+		print("⚡ Completando prompt da Pos2 (E)...")
+		completeProxymiPrompt(Enum.KeyCode.E)
+		task.wait(1)
+		
+		--// Repete
+		print("🔄 Ciclo completo! Reiniciando...")
+	end
+	
+	print("⛔ Farm encerrado!")
+end
+
+-- ============ CRIAR UI (BOTÃO DRAGGÁVEL) ============
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FarmGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = Player:WaitForChild("PlayerGui")
+
+local farmButton = Instance.new("TextButton")
+farmButton.Name = "FarmButton"
+farmButton.Size = UDim2.fromOffset(100, 50)
+farmButton.Position = UDim2.fromScale(0.5, 0.5)
+farmButton.AnchorPoint = Vector2.new(0.5, 0.5)
+farmButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+farmButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+farmButton.TextSize = 16
+farmButton.Font = Enum.Font.GothamBold
+farmButton.Text = "🌾 FARM"
+farmButton.BorderSizePixel = 2
+farmButton.BorderColor3 = Color3.fromRGB(100, 200, 255)
+farmButton.Parent = screenGui
+
+--// Efeito hover
+farmButton.MouseEnter:Connect(function()
+	farmButton.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+end)
+
+farmButton.MouseLeave:Connect(function()
+	farmButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+end)
+
+--// Drag system
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+farmButton.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = farmButton.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input, gameProcessed)
+	if not dragging then return end
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		local newX = startPos.X.Offset + delta.X
+		local newY = startPos.Y.Offset + delta.Y
+		farmButton.Position = UDim2.fromOffset(newX, newY)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+--// Click do botão
+farmButton.MouseButton1Click:Connect(function()
+	farmActive = not farmActive
+	
+	if farmActive then
+		print("🌾 FARM INICIADO!")
+		farmButton.BackgroundColor3 = Color3.fromRGB(50, 255, 100)
+		farmButton.Text = "🛑 STOP"
+		
+		--// Inicia o loop de farm em uma thread separada
+		task.spawn(farmLoop)
+	else
+		print("⛔ FARM PARADO!")
+		farmButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+		farmButton.Text = "🌾 FARM"
+	end
+end)
+
+--// Atualiza character quando respawna
+Player.CharacterAdded:Connect(function(newCharacter)
+	Character = newCharacter
+	farmActive = false
+	farmButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
+	farmButton.Text = "🌾 FARM"
+	print("⚠️ Personagem respawnou! Farm desativado.")
+end)
+
+print("✅ MONSTER PARASITE ESP + FARM ATIVADO")
+print("📍 Monitorando AreaEggSlotsClient")
+print("🌾 Botão Farm disponível (clique para ativar/desativar)")
