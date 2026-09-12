@@ -5,10 +5,6 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local player = Players.LocalPlayer
 
-pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/gomesdev007/Steal-an-egg-/refs/heads/main/Fun%C3%A7%C3%A3odoclon"))()
-end)
-
 local SPEED = 400
 local MIN_SPEED = 50
 local MAX_SPEED = 500
@@ -17,7 +13,6 @@ local DESTINATION = Vector3.new(497, 71, -354)
 local SLOW_DISTANCE = 20
 local SLOW_SPEED = 50
 
--- posição do jogador em cima do clone
 local HEAD_UP = 5
 local HEAD_BACK = 0
 
@@ -240,7 +235,6 @@ local function activate()
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- captura a posição ATUAL do jogador; não usa a posição do Guardian original
     local spawnCFrame = root.CFrame
 
     enabled = true
@@ -286,8 +280,8 @@ local function activate()
         return
     end
 
-    -- MOVIMENTO BASEADO NO SISTEMA PRONTO ENVIADO PELO USUÁRIO.
-    -- Sem GoTo, sem ponto de pausa e sem mover o jogador até o Guardian original.
+    -- Mesmo cálculo de movimento do arquivo movimet pronto.lua:
+    -- dt + distância + passo incremental, sem teleporte para os pontos.
     guardConnection = RunService.Heartbeat:Connect(function(dt)
         if not enabled or not clone or not clone.Parent then return end
 
@@ -296,7 +290,6 @@ local function activate()
         local difference = DESTINATION - currentPosition
         local distance = difference.Magnitude
 
-        -- chegou na posição FINAL: encerra tudo imediatamente
         if distance <= 0.05 then
             clone:PivotTo(CFrame.lookAt(DESTINATION, DESTINATION + currentCFrame.LookVector))
             enabled = false
@@ -307,7 +300,7 @@ local function activate()
 
         local direction = difference.Unit
         local currentSpeed = distance <= SLOW_DISTANCE and SLOW_SPEED or SPEED
-        local movement = math.min(currentSpeed * dt, distance)
+        local movement = math.min(distance, dt * currentSpeed)
         local newPosition = currentPosition + direction * movement
 
         clone:PivotTo(CFrame.lookAt(newPosition, newPosition + direction))
@@ -317,7 +310,6 @@ local function activate()
         end
     end)
 
-    -- mantém o personagem acima da cabeça, pegando carona
     playerConnection = RunService.RenderStepped:Connect(function()
         if not enabled then return end
         if not clone or not clone.Parent or not cloneHead then return end
