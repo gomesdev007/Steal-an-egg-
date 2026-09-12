@@ -144,8 +144,8 @@ end)
 
 local guardianButton
 
-local SPEED = 400
-local MIN_SPEED = 50
+local SPEED = 480
+local MIN_SPEED = 450
 local MAX_SPEED = 500
 
 local PAUSE_POSITION = Vector3.new(594, 71, -373)
@@ -158,7 +158,7 @@ local HEAD_UP = 1.5
 local HEAD_BACK = 2
 
 local WALK_ANIMATION_ID = "rbxassetid://131533059911792"
-local WALK_ANIMATION_SPEED = 8.196428
+local WALK_ANIMATION_SPEED = 8.696428
 
 local enabled = false
 local clone = nil
