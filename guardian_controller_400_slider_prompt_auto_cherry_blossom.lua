@@ -17,8 +17,8 @@ local DESTINATION = Vector3.new(497, 71, -354)
 local SLOW_DISTANCE = 20
 local SLOW_SPEED = 50
 
-local HEAD_UP = 3.5
-local HEAD_BACK = 2
+local HEAD_UP = 5
+local HEAD_BACK = 0
 
 local WALK_ANIMATION_ID = "rbxassetid://75608548920054"
 local WALK_ANIMATION_SPEED = 2
@@ -247,7 +247,6 @@ local function activate()
     enabled = true
     button.Text = "guardian: on"
 
-    -- O clone nasce exatamente na posição atual do jogador.
     local spawnCFrame = root.CFrame
     hideOriginal()
 
@@ -290,7 +289,6 @@ local function activate()
         return
     end
 
-    -- Locomoção direta: sem GoTo, sem ponto de pausa e sem parada intermediária.
     guardConnection = RunService.Heartbeat:Connect(function(dt)
         if not enabled or not clone or not clone.Parent then return end
 
@@ -299,7 +297,7 @@ local function activate()
         local difference = DESTINATION - currentPosition
         local distance = difference.Magnitude
 
-        if distance <= 0.5 then
+        if distance <= 0.05 then
             clone:PivotTo(CFrame.lookAt(DESTINATION, DESTINATION + currentCFrame.LookVector))
             enabled = false
             cleanup()
@@ -320,7 +318,6 @@ local function activate()
         end
     end)
 
-    -- Mantém o jogador em cima do Guardian enquanto ele estiver ativo.
     playerConnection = RunService.RenderStepped:Connect(function()
         if not enabled then return end
         if not clone or not clone.Parent or not cloneHead then return end
