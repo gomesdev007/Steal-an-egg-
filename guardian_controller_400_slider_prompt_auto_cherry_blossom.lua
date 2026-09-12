@@ -17,6 +17,7 @@ local DESTINATION = Vector3.new(497, 71, -354)
 local SLOW_DISTANCE = 20
 local SLOW_SPEED = 50
 
+-- posição do jogador em cima do clone
 local HEAD_UP = 5
 local HEAD_BACK = 0
 
@@ -63,12 +64,7 @@ local startPosition
 
 local function updateDrag(input)
     local delta = input.Position - dragStart
-    main.Position = UDim2.new(
-        startPosition.X.Scale,
-        startPosition.X.Offset + delta.X,
-        startPosition.Y.Scale,
-        startPosition.Y.Offset + delta.Y
-    )
+    main.Position = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + delta.X, startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
 end
 
 main.InputBegan:Connect(function(input)
@@ -244,10 +240,11 @@ local function activate()
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
+    -- captura a posição ATUAL do jogador; não usa a posição do Guardian original
+    local spawnCFrame = root.CFrame
+
     enabled = true
     button.Text = "guardian: on"
-
-    local spawnCFrame = root.CFrame
     hideOriginal()
 
     clone = guard:Clone()
@@ -289,6 +286,8 @@ local function activate()
         return
     end
 
+    -- MOVIMENTO BASEADO NO SISTEMA PRONTO ENVIADO PELO USUÁRIO.
+    -- Sem GoTo, sem ponto de pausa e sem mover o jogador até o Guardian original.
     guardConnection = RunService.Heartbeat:Connect(function(dt)
         if not enabled or not clone or not clone.Parent then return end
 
@@ -297,6 +296,7 @@ local function activate()
         local difference = DESTINATION - currentPosition
         local distance = difference.Magnitude
 
+        -- chegou na posição FINAL: encerra tudo imediatamente
         if distance <= 0.05 then
             clone:PivotTo(CFrame.lookAt(DESTINATION, DESTINATION + currentCFrame.LookVector))
             enabled = false
@@ -313,11 +313,11 @@ local function activate()
         clone:PivotTo(CFrame.lookAt(newPosition, newPosition + direction))
 
         if walkTrack then
-            local animationSpeed = currentSpeed == SLOW_SPEED and (WALK_ANIMATION_SPEED * 0.25) or WALK_ANIMATION_SPEED
-            walkTrack:AdjustSpeed(animationSpeed)
+            walkTrack:AdjustSpeed(WALK_ANIMATION_SPEED)
         end
     end)
 
+    -- mantém o personagem acima da cabeça, pegando carona
     playerConnection = RunService.RenderStepped:Connect(function()
         if not enabled then return end
         if not clone or not clone.Parent or not cloneHead then return end
