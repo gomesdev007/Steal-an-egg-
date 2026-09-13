@@ -1,6 +1,7 @@
 -- Auto Steal movement test
 -- Uses the Auto Steal movement method from the supplied open source.
 -- Travel speed changed to 400.
+-- Destination uses the same spawn-resolution method from the open source.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -61,6 +62,15 @@ local function recoverCharacter()
                 end
             end)
         end
+    end
+    local humanoid = getHumanoid()
+    if humanoid then
+        pcall(function()
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end)
+        pcall(function()
+            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+        end)
     end
 end
 
@@ -225,41 +235,53 @@ local function autoStealMove(targetPosition, token)
     return reached
 end
 
-local function findOwnPlot()
-    local plots = workspace:FindFirstChild("Plots")
-    if not plots then return nil end
+-- Same destination resolution used by the open source value116():
+-- 1. Player.RespawnLocation
+-- 2. First SpawnLocation in Workspace
+-- 3. Own plot pivot as fallback
+local function findMySpawn()
+    local respawnLocation = LocalPlayer.RespawnLocation
 
-    local rf = workspace:FindFirstChild("RF")
-    local homestead = rf and rf:FindFirstChild("Homestead")
-    local askState = homestead and homestead:FindFirstChild("AskState")
+    if respawnLocation and respawnLocation:IsA("BasePart") then
+        return respawnLocation.CFrame.Position + Vector3.new(0, 4, 0)
+    end
 
-    if askState and askState:IsA("RemoteFunction") then
-        local ok, data = pcall(function()
-            return askState:InvokeServer()
-        end)
-        if ok and type(data) == "table" then
-            local owners = data.OwnersBySlot or data.SlotOwners or data.Owners or data.Slots
-            if type(owners) == "table" then
-                for slot, owner in pairs(owners) do
-                    local ownerId = owner
-                    if type(owner) == "table" then
-                        ownerId = owner.UserId or owner.OwnerUserId or owner.Id or owner.Name
-                    end
-                    if ownerId == LocalPlayer.UserId or ownerId == tostring(LocalPlayer.UserId) or ownerId == LocalPlayer.Name then
-                        local plot = plots:FindFirstChild(tostring(slot))
-                        if plot then return plot end
-                    end
-                end
-            end
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        if descendant:IsA("SpawnLocation") then
+            return descendant.Position + Vector3.new(0, 4, 0)
         end
     end
 
-    for _, plot in ipairs(plots:GetChildren()) do
-        for _, descendant in ipairs(plot:GetDescendants()) do
-            if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
-                local ok, text = pcall(function() return descendant.Text end)
-                if ok and type(text) == "string" and text:find(LocalPlayer.Name, 1, true) then
-                    return plot
+    local plots = workspace:FindFirstChild("Plots")
+    if plots then
+        local rf = workspace:FindFirstChild("RF")
+        local homestead = rf and rf:FindFirstChild("Homestead")
+        local askState = homestead and homestead:FindFirstChild("AskState")
+
+        if askState and askState:IsA("RemoteFunction") then
+            local ok, data = pcall(function()
+                return askState:InvokeServer()
+            end)
+            if ok and type(data) == "table" then
+                local owners = data.OwnersBySlot or data.SlotOwners or data.Owners or data.Slots
+                if type(owners) == "table" then
+                    for slot, owner in pairs(owners) do
+                        local ownerId = owner
+                        if type(owner) == "table" then
+                            ownerId = owner.UserId or owner.OwnerUserId or owner.Id or owner.Name
+                        end
+                        if ownerId == LocalPlayer.UserId or ownerId == tostring(LocalPlayer.UserId) or ownerId == LocalPlayer.Name then
+                            local plot = plots:FindFirstChild(tostring(slot))
+                            if plot then
+                                local okPivot, pivot = pcall(function()
+                                    return plot:GetPivot()
+                                end)
+                                if okPivot and pivot then
+                                    return pivot.Position + Vector3.new(0, 4, 0)
+                                end
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -269,7 +291,7 @@ local function findOwnPlot()
 end
 
 local gui = Instance.new("ScreenGui")
-gui.Name = "AutoStealPlotMovementTest"
+gui.Name = "AutoStealSpawnMovementTest"
 gui.ResetOnSpawn = false
 gui.Parent = game:GetService("CoreGui")
 
@@ -302,7 +324,7 @@ button.Position = UDim2.new(0, 10, 0, 34)
 button.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
 button.BorderSizePixel = 0
 button.Font = Enum.Font.GothamMedium
-button.Text = "go to my plot"
+button.Text = "go to my spawn"
 button.TextColor3 = Color3.fromRGB(220, 220, 220)
 button.TextSize = 12
 button.Parent = frame
@@ -341,26 +363,15 @@ button.MouseButton1Click:Connect(function()
     if moving then
         moving = false
         travelToken += 1
-        button.Text = "go to my plot"
+        button.Text = "go to my spawn"
         return
     end
 
-    local plot = findOwnPlot()
-    if not plot then
-        button.Text = "plot not found"
+    local spawnPosition = findMySpawn()
+    if not spawnPosition then
+        button.Text = "spawn not found"
         task.delay(2, function()
-            if button.Parent then button.Text = "go to my plot" end
-        end)
-        return
-    end
-
-    local ok, pivot = pcall(function()
-        return plot:GetPivot()
-    end)
-    if not ok or not pivot then
-        button.Text = "position not found"
-        task.delay(2, function()
-            if button.Parent then button.Text = "go to my plot" end
+            if button.Parent then button.Text = "go to my spawn" end
         end)
         return
     end
@@ -372,11 +383,11 @@ button.MouseButton1Click:Connect(function()
     refreshRayFilter()
 
     task.spawn(function()
-        local reached = autoStealMove(pivot.Position, token)
+        local reached = autoStealMove(spawnPosition, token)
         if token ~= travelToken then return end
         moving = false
         button.Text = reached and "arrived" or "stopped"
         task.wait(1)
-        if button.Parent then button.Text = "go to my plot" end
+        if button.Parent then button.Text = "go to my spawn" end
     end)
 end)
