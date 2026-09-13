@@ -1,7 +1,9 @@
 -- auto complete index only
--- loads no other gui
+-- target areas use the same area data used by the source Egg ESP
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -11,6 +13,8 @@ local slowEggDistance = 40
 local slowPlotDistance = 30
 local running = false
 local selectedAreas = {}
+local areaKeys = {}
+local areaLabels = {}
 
 local rarityOrder = {
     Common = 1, Rare = 2, Epic = 3, Legendary = 4,
@@ -23,20 +27,57 @@ local function characterParts()
     return character, character:FindFirstChildOfClass("Humanoid"), character:FindFirstChild("HumanoidRootPart")
 end
 
+-- Same source used by Egg ESP: ReplicatedStorage.Data.Areas
 local function getAreaNames()
-    local result, seen = {}, {}
-    for _, containerName in ipairs({"Areas", "Islands"}) do
-        local container = workspace:FindFirstChild(containerName)
-        if container then
-            for _, child in ipairs(container:GetChildren()) do
-                if not seen[child.Name] then
-                    seen[child.Name] = true
-                    result[#result + 1] = child.Name
+    local result = {}
+    local seen = {}
+    areaKeys = {}
+    areaLabels = {}
+
+    local dataFolder = ReplicatedStorage:FindFirstChild("Data")
+    local areasModule = dataFolder and dataFolder:FindFirstChild("Areas")
+
+    if areasModule and areasModule:IsA("ModuleScript") then
+        local ok, data = pcall(require, areasModule)
+        if ok and type(data) == "table" then
+            data = data.Directory or data
+            for key, info in pairs(data) do
+                if type(key) == "string" and type(info) == "table" then
+                    local label = info.DisplayName or info.Name or key
+                    if type(label) == "string" and label ~= "" and not seen[label] then
+                        seen[label] = true
+                        result[#result + 1] = label
+                        areaKeys[label] = key
+                        areaLabels[key] = label
+                    end
                 end
             end
         end
     end
-    table.sort(result)
+
+    -- Fallback only if the module is unavailable.
+    if #result == 0 then
+        for _, containerName in ipairs({"Areas", "Islands"}) do
+            local container = workspace:FindFirstChild(containerName)
+            if container then
+                for _, child in ipairs(container:GetChildren()) do
+                    if not seen[child.Name] then
+                        seen[child.Name] = true
+                        result[#result + 1] = child.Name
+                        areaKeys[child.Name] = child.Name
+                        areaLabels[child.Name] = child.Name
+                    end
+                end
+            end
+        end
+    end
+
+    table.sort(result, function(a, b)
+        local ka, kb = areaKeys[a], areaKeys[b]
+        local ia, ib = dataFolder and areasModule, dataFolder and areasModule
+        return tostring(a) < tostring(b)
+    end)
+
     return result
 end
 
@@ -44,9 +85,15 @@ local function isAreaSelected(prompt)
     local count = 0
     for _ in pairs(selectedAreas) do count += 1 end
     if count == 0 then return true end
+
     local obj = prompt.Parent
     while obj and obj ~= workspace do
-        if selectedAreas[obj.Name] then return true end
+        local name = obj.Name
+        for label in pairs(selectedAreas) do
+            if name == label or name == areaKeys[label] then
+                return true
+            end
+        end
         obj = obj.Parent
     end
     return false
@@ -87,6 +134,7 @@ local function findBestEgg()
     local _, _, root = characterParts()
     if not root then return nil end
     local best, bestScore, bestDistance = nil, -1, math.huge
+
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("ProximityPrompt") and obj.Enabled and isEggPrompt(obj) and isAreaSelected(obj) then
             local part = obj.Parent
@@ -165,8 +213,51 @@ frame.Size = UDim2.fromOffset(230, 150)
 frame.Position = UDim2.new(0, 12, 0.5, 55)
 frame.BackgroundColor3 = Color3.fromRGB(22,22,22)
 frame.BorderSizePixel = 0
+frame.Active = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+-- PC + mobile dragging
+local dragging = false
+local dragStart
+local startPos
+local dragInput
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    frame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        dragInput = input
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        updateDrag(input)
+    end
+end)
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,-16,0,28)
@@ -178,6 +269,8 @@ title.Font = Enum.Font.GothamSemibold
 title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
+
+title.Active = false
 
 local areaButton = Instance.new("TextButton")
 areaButton.Size = UDim2.new(1,-16,0,34)
@@ -219,7 +312,9 @@ local function refreshAreaList()
     for _, child in ipairs(areaList:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
-    for _, area in ipairs(getAreaNames()) do
+
+    local areas = getAreaNames()
+    for _, area in ipairs(areas) do
         local b = Instance.new("TextButton")
         b.Size = UDim2.new(1,-6,0,27)
         b.BackgroundColor3 = selectedAreas[area] and Color3.fromRGB(70,35,35) or Color3.fromRGB(40,40,40)
@@ -231,7 +326,11 @@ local function refreshAreaList()
         b.Parent = areaList
         Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
         b.Activated:Connect(function()
-            if selectedAreas[area] then selectedAreas[area] = nil else selectedAreas[area] = true end
+            if selectedAreas[area] then
+                selectedAreas[area] = nil
+            else
+                selectedAreas[area] = true
+            end
             refreshAreaList()
         end)
     end
@@ -247,6 +346,7 @@ end)
 toggle.Activated:Connect(function()
     running = not running
     toggle.Text = running and "auto complete index: on" or "auto complete index: off"
+
     if running then
         task.spawn(function()
             while running do
