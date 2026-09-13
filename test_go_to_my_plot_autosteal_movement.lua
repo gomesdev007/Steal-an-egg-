@@ -1,7 +1,6 @@
 -- Auto Steal movement test
 -- Uses the Auto Steal movement method from the supplied open source.
 -- Travel speed changed to 400.
--- Destination uses the same spawn-resolution method from the open source.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -62,15 +61,6 @@ local function recoverCharacter()
                 end
             end)
         end
-    end
-    local humanoid = getHumanoid()
-    if humanoid then
-        pcall(function()
-            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-        end)
-        pcall(function()
-            humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-        end)
     end
 end
 
@@ -136,31 +126,20 @@ local function setPhysics(root, humanoid)
     end)
 end
 
--- Complete Auto Steal-style movement core.
 local function autoStealMove(targetPosition, token)
     local root = getRoot()
     local humanoid = getHumanoid()
     if not root or not humanoid then return false end
 
     local startPosition = root.Position
-    local vector = Vector3.new(
-        targetPosition.X - startPosition.X,
-        0,
-        targetPosition.Z - startPosition.Z
-    )
+    local vector = Vector3.new(targetPosition.X - startPosition.X, 0, targetPosition.Z - startPosition.Z)
     local magnitude = vector.Magnitude
     if magnitude <= 0.5 then return true end
 
     local unit = vector.Unit
     local rotation = CFrame.lookAt(Vector3.zero, unit).Rotation
     local rootHeight = getRootHeight()
-
-    local groundY = getGroundY(
-        startPosition.X,
-        startPosition.Z,
-        startPosition.Y - rootHeight
-    )
-
+    local groundY = getGroundY(startPosition.X, startPosition.Z, startPosition.Y - rootHeight)
     local currentY = (groundY or (startPosition.Y - rootHeight)) + rootHeight
     local travelled = 0
     local deadline = tick() + magnitude / TRAVEL_SPEED + 10
@@ -176,8 +155,7 @@ local function autoStealMove(targetPosition, token)
         humanoid = getHumanoid()
         if not root or not root.Parent or not humanoid or humanoid.Health <= 0 then break end
 
-        local distanceMoved = (root.Position - lastPosition).Magnitude
-        if distanceMoved > 2 then
+        if (root.Position - lastPosition).Magnitude > 2 then
             lastPosition = root.Position
             lastProgress = tick()
         elseif tick() - lastProgress > 0.5 then
@@ -185,45 +163,26 @@ local function autoStealMove(targetPosition, token)
             recoverCharacter()
         end
 
-        local stepDistance = math.min(
-            TRAVEL_SPEED * math.min(dt, 0.1),
-            magnitude - travelled
-        )
-
+        local stepDistance = math.min(TRAVEL_SPEED * math.min(dt, 0.1), magnitude - travelled)
         local subSteps = math.max(1, math.ceil(stepDistance / STEP_MAX))
         local step = stepDistance / subSteps
 
         for _ = 1, subSteps do
             travelled = math.min(magnitude, travelled + step)
             local nextPosition = startPosition + unit * travelled
-
-            local detectedGround = getGroundY(
-                nextPosition.X,
-                nextPosition.Z,
-                currentY - rootHeight
-            )
+            local detectedGround = getGroundY(nextPosition.X, nextPosition.Z, currentY - rootHeight)
 
             if detectedGround then
-                currentY += math.clamp(
-                    detectedGround + rootHeight - currentY,
-                    -STEP_MAX * 4,
-                    STEP_MAX * 4
-                )
+                currentY += math.clamp(detectedGround + rootHeight - currentY, -STEP_MAX * 4, STEP_MAX * 4)
             end
 
             if travelled >= magnitude then break end
         end
 
         local nextPosition = startPosition + unit * travelled
-
         pcall(function()
-            root.CFrame = CFrame.new(
-                nextPosition.X,
-                currentY,
-                nextPosition.Z
-            ) * rotation
+            root.CFrame = CFrame.new(nextPosition.X, currentY, nextPosition.Z) * rotation
         end)
-
         setPhysics(root, humanoid)
 
         if travelled >= magnitude - 0.01 then
@@ -235,55 +194,15 @@ local function autoStealMove(targetPosition, token)
     return reached
 end
 
--- Same destination resolution used by the open source value116():
--- 1. Player.RespawnLocation
--- 2. First SpawnLocation in Workspace
--- 3. Own plot pivot as fallback
-local function findMySpawn()
-    local respawnLocation = LocalPlayer.RespawnLocation
-
-    if respawnLocation and respawnLocation:IsA("BasePart") then
-        return respawnLocation.CFrame.Position + Vector3.new(0, 4, 0)
+local function findSpawn()
+    local respawn = LocalPlayer.RespawnLocation
+    if respawn and respawn:IsA("BasePart") then
+        return respawn.Position + Vector3.new(0, 4, 0)
     end
 
     for _, descendant in ipairs(workspace:GetDescendants()) do
         if descendant:IsA("SpawnLocation") then
             return descendant.Position + Vector3.new(0, 4, 0)
-        end
-    end
-
-    local plots = workspace:FindFirstChild("Plots")
-    if plots then
-        local rf = workspace:FindFirstChild("RF")
-        local homestead = rf and rf:FindFirstChild("Homestead")
-        local askState = homestead and homestead:FindFirstChild("AskState")
-
-        if askState and askState:IsA("RemoteFunction") then
-            local ok, data = pcall(function()
-                return askState:InvokeServer()
-            end)
-            if ok and type(data) == "table" then
-                local owners = data.OwnersBySlot or data.SlotOwners or data.Owners or data.Slots
-                if type(owners) == "table" then
-                    for slot, owner in pairs(owners) do
-                        local ownerId = owner
-                        if type(owner) == "table" then
-                            ownerId = owner.UserId or owner.OwnerUserId or owner.Id or owner.Name
-                        end
-                        if ownerId == LocalPlayer.UserId or ownerId == tostring(LocalPlayer.UserId) or ownerId == LocalPlayer.Name then
-                            local plot = plots:FindFirstChild(tostring(slot))
-                            if plot then
-                                local okPivot, pivot = pcall(function()
-                                    return plot:GetPivot()
-                                end)
-                                if okPivot and pivot then
-                                    return pivot.Position + Vector3.new(0, 4, 0)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
         end
     end
 
@@ -301,7 +220,6 @@ frame.Position = UDim2.new(0.5, -95, 0.5, -38)
 frame.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 frame.BorderSizePixel = 0
 frame.Parent = gui
-
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
 local stroke = Instance.new("UIStroke", frame)
 stroke.Color = Color3.fromRGB(35, 35, 35)
@@ -350,12 +268,7 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startFramePosition.X.Scale,
-            startFramePosition.X.Offset + delta.X,
-            startFramePosition.Y.Scale,
-            startFramePosition.Y.Offset + delta.Y
-        )
+        frame.Position = UDim2.new(startFramePosition.X.Scale, startFramePosition.X.Offset + delta.X, startFramePosition.Y.Scale, startFramePosition.Y.Offset + delta.Y)
     end
 end)
 
@@ -367,7 +280,7 @@ button.MouseButton1Click:Connect(function()
         return
     end
 
-    local spawnPosition = findMySpawn()
+    local spawnPosition = findSpawn()
     if not spawnPosition then
         button.Text = "spawn not found"
         task.delay(2, function()
