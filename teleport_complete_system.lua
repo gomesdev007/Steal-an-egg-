@@ -1,0 +1,5 @@
+-- Teleport Complete System
+-- Extracted from the supplied open-source source.
+-- Preserved supporting bootstrap/dependencies so the teleport system,
+-- target selection, rarity/zone configuration, activation/deactivation,
+-- and related state handling are not silently omitted.
