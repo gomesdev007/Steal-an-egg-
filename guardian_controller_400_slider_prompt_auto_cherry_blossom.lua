@@ -12,28 +12,36 @@ end)
 local SPEED = 420
 local MIN_SPEED = 50
 local MAX_SPEED = 500
+
 local PAUSE_POSITION = Vector3.new(594, 71, -373)
 local DESTINATION = Vector3.new(497, 71, -354)
-local PAUSE_TIME = 1
-local SLOW_DISTANCE = 20
-local SLOW_SPEED = 50
 
-local HEAD_UP = 5
-local HEAD_BACK = 0
+local PAUSE_DISTANCE = 3
+local PAUSE_TIME = 0.50
 
-local WALK_ANIMATION_ID = "rbxassetid://75608548920054"
-local WALK_ANIMATION_SPEED = 2
+local HEAD_UP = 1.5
+local HEAD_BACK = 2
+
+local WALK_ANIMATION_ID = "rbxassetid://131533059911792"
+local WALK_ANIMATION_SPEED = 8.196428
 
 local enabled = false
 local clone = nil
 local cloneHead = nil
 local walkTrack = nil
+
 local guardConnection = nil
 local playerConnection = nil
-local promptAutoConnection = nil
-local originalTransparency = {}
+
+local playerReleased = false
 local pauseStarted = false
-local guardArea = workspace.__OBJECTS.Areas.GuardAreas["Cherry Blossom"]
+local finalMoveStarted = false
+local finalMoveConnection = nil
+local promptAutoConnection = nil
+
+local originalTransparency = {}
+
+local guardArea = workspace.__OBJECTS.Areas.GuardAreas["Titan Temple"]
 local guard = guardArea:FindFirstChild("Guard")
 
 if not guard then
@@ -61,6 +69,7 @@ mainCorner.Parent = main
 local dragging = false
 local dragStart
 local startPosition
+
 local function updateDrag(input)
     local delta = input.Position - dragStart
     main.Position = UDim2.new(
@@ -70,6 +79,7 @@ local function updateDrag(input)
         startPosition.Y.Offset + delta.Y
     )
 end
+
 main.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -77,11 +87,13 @@ main.InputBegan:Connect(function(input)
         startPosition = main.Position
     end
 end)
+
 main.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         updateDrag(input)
@@ -108,7 +120,7 @@ speedLabel.Size = UDim2.fromOffset(170, 18)
 speedLabel.Position = UDim2.fromOffset(10, 48)
 speedLabel.BackgroundTransparency = 1
 speedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-speedLabel.Text = "speed: 420"
+speedLabel.Text = "speed: " .. SPEED
 speedLabel.TextSize = 12
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.Parent = main
@@ -147,6 +159,7 @@ sliderButton.Parent = sliderBackground
 local sliderButtonCorner = Instance.new("UICorner")
 sliderButtonCorner.CornerRadius = UDim.new(1, 0)
 sliderButtonCorner.Parent = sliderButton
+
 local sliderDragging = false
 
 local function setSpeedFromX(x)
@@ -159,17 +172,20 @@ local function setSpeedFromX(x)
     sliderFill.Size = UDim2.new(percent, 0, 1, 0)
     sliderButton.Position = UDim2.new(percent, 0, 0.5, 0)
 end
+
 sliderBackground.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         sliderDragging = true
         setSpeedFromX(input.Position.X)
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if sliderDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         setSpeedFromX(input.Position.X)
     end
 end)
+
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         sliderDragging = false
@@ -205,6 +221,7 @@ end
 local function stopConnections()
     if guardConnection then guardConnection:Disconnect(); guardConnection = nil end
     if playerConnection then playerConnection:Disconnect(); playerConnection = nil end
+    if finalMoveConnection then finalMoveConnection:Disconnect(); finalMoveConnection = nil end
 end
 
 local function cleanup()
@@ -222,6 +239,7 @@ local function cleanup()
     end
     cloneHead = nil
     pauseStarted = false
+    finalMoveStarted = false
     showOriginal()
     local character = player.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
@@ -231,103 +249,88 @@ local function cleanup()
     end
 end
 
-local function getMovingPart(model)
-    if not model or not model.Parent then return nil end
-    local part = model:FindFirstChild("HumanoidRootPart", true)
-    if part and part:IsA("BasePart") then return part end
-    if model.PrimaryPart and model.PrimaryPart:IsA("BasePart") then return model.PrimaryPart end
-    return model:FindFirstChildWhichIsA("BasePart", true)
-end
+local function GoTo(pos)
+    local character = player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not root or not humanoid then return false end
 
-local function moveTo(targetCFrame, speed)
-    if not clone or not clone.Parent then return false end
-    local part = getMovingPart(clone)
-    if not part then return false end
+    local target = pos.BoundsCFrame.Position
+    local timeout = os.clock() + 15
 
-    speed = math.max(60, speed or 420)
-    local currentCFrame = clone:GetPivot()
-    local current = currentCFrame.Position
-    local target = targetCFrame.Position
-    local startPosition = current
-    local distance = (target - current).Magnitude
-    local startTime = os.clock()
-    local timeout = startTime + 15
-
-    while clone and clone.Parent and os.clock() < timeout do
-        part = getMovingPart(clone)
-        if not part then return false end
-
-        current = clone:GetPivot().Position
-        local remaining = target - current
-        local remainingDistance = remaining.Magnitude
-
-        if remainingDistance <= 6 then
-            clone:PivotTo(targetCFrame)
-            pcall(function()
-                part.AssemblyLinearVelocity = Vector3.zero
-                part.AssemblyAngularVelocity = Vector3.zero
-            end)
-            return true
-        end
-
-        local deltaTime = RunService.Heartbeat:Wait()
-        current = clone:GetPivot().Position
-
-        local xDirection = math.sign(target.X - current.X)
-        local xStep = xDirection * math.min(math.abs(target.X - current.X), speed * deltaTime)
-        local newX = current.X + xStep
-
-        local yDirection = math.sign(target.Y - current.Y)
-        local yStep = yDirection * math.min(math.abs(target.Y - current.Y), speed * deltaTime)
-        local newY = current.Y + yStep
-
-        local zDirection = math.sign(target.Z - current.Z)
-        local zStep = zDirection * math.min(math.abs(target.Z - current.Z), speed * deltaTime)
-        local newZ = current.Z + zStep
-
-        local newPosition = Vector3.new(newX, newY, newZ)
-        local offset = newPosition - current
-        local direction = offset.Magnitude > 0.05 and offset.Unit or clone:GetPivot().LookVector
-
-        pcall(function()
-            clone:PivotTo(CFrame.lookAt(newPosition, newPosition + direction))
-            part.AssemblyLinearVelocity = Vector3.zero
-            part.AssemblyAngularVelocity = Vector3.zero
-        end)
+    while enabled and os.clock() < timeout do
+        root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return false end
+        local current = root.Position
+        local difference = target - current
+        local dist = difference.Magnitude
+        if dist <= 5 then break end
+        local dt = RunService.Heartbeat:Wait()
+        local step = math.min(dist, dt * SPEED)
+        character:MoveTo(current + difference.Unit * step)
     end
-
-    return false
+    return true
 end
 
 local function startFinalMove()
-    if not enabled or not clone or not clone.Parent then return end
-    local finalTarget = CFrame.new(DESTINATION)
-    task.spawn(function()
-        moveTo(finalTarget, SPEED)
-        if clone and clone.Parent then
-            clone:PivotTo(finalTarget)
+    if finalMoveStarted or not enabled then return end
+    finalMoveStarted = true
+    playerReleased = true
+
+    local character = player.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not root then return end
+
+    humanoid.PlatformStand = false
+    humanoid.AutoRotate = true
+    humanoid.WalkSpeed = SPEED
+    root.CFrame = CFrame.new(PAUSE_POSITION + Vector3.new(0, 3, 0))
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+    humanoid:MoveTo(DESTINATION)
+
+    local elapsed = 0
+    finalMoveConnection = RunService.Heartbeat:Connect(function(dt)
+        if not enabled then return end
+        local currentCharacter = player.Character
+        local currentHumanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
+        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+        if not currentHumanoid or not currentRoot then return end
+        if (currentRoot.Position - DESTINATION).Magnitude <= 4 then
+            finalMoveConnection:Disconnect()
+            finalMoveConnection = nil
+            return
         end
-        if enabled then
-            enabled = false
-            cleanup()
-            button.Text = "guardian: off"
+        elapsed += dt
+        if elapsed >= 0.20 then
+            elapsed = 0
+            currentHumanoid:MoveTo(DESTINATION)
         end
     end)
 end
 
 local function activate()
     if enabled then return end
-
     local character = player.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
     enabled = true
-    pauseStarted = false
     button.Text = "guardian: on"
+    playerReleased = false
+    pauseStarted = false
+    finalMoveStarted = false
 
-    local spawnCFrame = root.CFrame
+    local spawnCFrame = guard:GetPivot()
+    local pos = {BoundsCFrame = spawnCFrame}
     hideOriginal()
+
+    local arrived = GoTo(pos)
+    if not arrived or not enabled then return end
+    task.wait(0.10)
+    if not enabled then return end
 
     clone = guard:Clone()
     clone.Name = "GuardianClone"
@@ -367,23 +370,35 @@ local function activate()
         return
     end
 
-    guardConnection = RunService.Heartbeat:Connect(function()
+    guardConnection = RunService.Heartbeat:Connect(function(dt)
         if not enabled or not clone or not clone.Parent then return end
         if pauseStarted then return end
 
         local currentCFrame = clone:GetPivot()
-        local current = currentCFrame.Position
+        local currentPosition = currentCFrame.Position
         local target = PAUSE_POSITION
-        local distance = (target - current).Magnitude
+        local distance = (target - currentPosition).Magnitude
 
-        if distance <= 6 then
-            clone:PivotTo(CFrame.lookAt(target, target + currentCFrame.LookVector))
+        if distance <= PAUSE_DISTANCE then
+            clone:PivotTo(CFrame.lookAt(PAUSE_POSITION, PAUSE_POSITION + currentCFrame.LookVector))
             pauseStarted = true
             if walkTrack then walkTrack:AdjustSpeed(0) end
 
             task.delay(PAUSE_TIME, function()
                 if not enabled or not clone or not clone.Parent then return end
                 startFinalMove()
+                if clone then
+                    clone:Destroy()
+                    clone = nil
+                end
+                cloneHead = nil
+                if walkTrack then
+                    pcall(function()
+                        walkTrack:Stop()
+                        walkTrack:Destroy()
+                    end)
+                    walkTrack = nil
+                end
             end)
             return
         end
@@ -391,37 +406,38 @@ local function activate()
         local speed = math.max(60, SPEED or 420)
         local deltaTime = math.min(dt or 0.016, 0.1)
 
-        local xDirection = math.sign(target.X - current.X)
-        local xStep = xDirection * math.min(math.abs(target.X - current.X), speed * deltaTime)
-        local newX = current.X + xStep
+        local xDirection = math.sign(target.X - currentPosition.X)
+        local xStep = xDirection * math.min(math.abs(target.X - currentPosition.X), speed * deltaTime)
+        local newX = currentPosition.X + xStep
 
-        local yDirection = math.sign(target.Y - current.Y)
-        local yStep = yDirection * math.min(math.abs(target.Y - current.Y), speed * deltaTime)
-        local newY = current.Y + yStep
+        local yDirection = math.sign(target.Y - currentPosition.Y)
+        local yStep = yDirection * math.min(math.abs(target.Y - currentPosition.Y), speed * deltaTime)
+        local newY = currentPosition.Y + yStep
 
-        local zDirection = math.sign(target.Z - current.Z)
-        local zStep = zDirection * math.min(math.abs(target.Z - current.Z), speed * deltaTime)
-        local newZ = current.Z + zStep
+        local zDirection = math.sign(target.Z - currentPosition.Z)
+        local zStep = zDirection * math.min(math.abs(target.Z - currentPosition.Z), speed * deltaTime)
+        local newZ = currentPosition.Z + zStep
 
         local newPosition = Vector3.new(newX, newY, newZ)
-        local offset = newPosition - current
+        local offset = newPosition - currentPosition
         local direction = offset.Magnitude > 0.05 and offset.Unit or currentCFrame.LookVector
 
         clone:PivotTo(CFrame.lookAt(newPosition, newPosition + direction))
 
-        local movingPart = getMovingPart(clone)
-        if movingPart then
+        local movingPart = clone:FindFirstChild("HumanoidRootPart", true) or clone.PrimaryPart
+        if movingPart and movingPart:IsA("BasePart") then
             movingPart.AssemblyLinearVelocity = Vector3.zero
             movingPart.AssemblyAngularVelocity = Vector3.zero
         end
     end)
 
     playerConnection = RunService.RenderStepped:Connect(function()
-        if not enabled then return end
+        if not enabled or playerReleased then return end
         if not clone or not clone.Parent or not cloneHead then return end
         local currentCharacter = player.Character
-        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
-        local humanoid = currentCharacter and currentCharacter:FindFirstChildOfClass("Humanoid")
+        if not currentCharacter then return end
+        local currentRoot = currentCharacter:FindFirstChild("HumanoidRootPart")
+        local humanoid = currentCharacter:FindFirstChildOfClass("Humanoid")
         if not currentRoot or not humanoid then return end
         local targetCFrame = cloneHead.CFrame * CFrame.new(0, cloneHead.Size.Y / 2 + HEAD_UP, HEAD_BACK)
         currentRoot.CFrame = targetCFrame
